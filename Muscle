@@ -297,16 +297,13 @@ end)
 
 local tabs = {
 	main = utils.HonenxWhite:AddTab("Main"),
-	killing = utils.HonenxWhite:AddTab("Killing"),
 	specs = utils.HonenxWhite:AddTab("Specs"),
 	farming = utils.HonenxWhite:AddTab("Farming"),
 	fast = utils.HonenxWhite:AddTab("⚡ Fast"),
 	boss = utils.HonenxWhite:AddTab("Boss"),
 	inventory = utils.HonenxWhite:AddTab("Pets"),
-	boosts = utils.HonenxWhite:AddTab("Boosts"),
 	teleport = utils.HonenxWhite:AddTab("Teleports"),
-	stats = utils.HonenxWhite:AddTab("Stats"),
-	info = utils.HonenxWhite:AddTab("Info")
+	stats = utils.HonenxWhite:AddTab("Stats")
 }
 
 for _, tab in pairs(tabs) do
@@ -3465,9 +3462,9 @@ tabs.fast.FastRepWorkerLoop = function()
                 if ping < 80 then
                     targetSpeed = 800
                 elseif ping < 150 then
-                    targetSpeed = 600
+                    targetSpeed = 700
                 elseif ping < 250 then
-                    targetSpeed = 400
+                    targetSpeed = 659
                 elseif ping < 400 then
                     targetSpeed = 200
                 else
