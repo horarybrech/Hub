@@ -105,7 +105,7 @@ fastTab:AddLabel("⚡ FAST REP (Adaptativo por Ping):")
 -- Fast Rep Data
 local fastRepData = {
     Running = false,
-    SendRate = 659,
+    SendRate = 400,
     CurrentPing = 0,
     LastPingCheck = 0,
     MaxBurst = 32,
@@ -127,15 +127,15 @@ fastRepData.AdaptiveMode = true
 
 local function calculateSpeedByPing(ping)
     if ping < 80 then
-        return 1200, 
+        return 1200,
     elseif ping < 150 then
-        return 700, 
+        return 700,
     elseif ping < 250 then
-        return 659, 
+        return 659,
     elseif ping < 400 then
-        return 200, 
+        return 200,
     else
-        return 50, "⚫ Muy Lento"
+        return 50,
     end
 end
 
