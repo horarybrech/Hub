@@ -95,7 +95,7 @@ local speedSwitch = mainTab:AddSwitch("Set Speed", function(bool)
 end)
 
 mainTab:AddLabel("")
-mainTab:AddLabel("Made by horarybrech")
+mainTab:AddLabel("Made by Null")
 
 -- =========================================================
 -- FAST FARM + FAST REBIRTH TAB (MISMA PESTAÑA)
@@ -105,14 +105,14 @@ fastTab:AddLabel("⚡ FAST REP (Adaptativo por Ping):")
 -- Fast Rep Data
 local fastRepData = {
     Running = false,
-    SendRate = 400,
+    SendRate = 659,
     CurrentPing = 0,
     LastPingCheck = 0,
     MaxBurst = 32,
     SendTokens = 0,
     LastLoopAt = os.clock(),
     MinReps = 50,
-    MaxReps = 800,
+    MaxReps = 1200,
     AdaptiveMode = true
 }
 
@@ -125,23 +125,15 @@ fastTab:AddSwitch("Modo Adaptativo (Auto por Ping)", function(state)
 end)
 fastRepData.AdaptiveMode = true
 
-fastTab:AddLabel("")
-fastTab:AddLabel("📊 Velocidades por Ping:")
-fastTab:AddLabel("  🟢 <80ms = 800 reps/s")
-fastTab:AddLabel("  🟡 80-150ms = 600 reps/s")
-fastTab:AddLabel("  🟠 150-250ms = 400 reps/s")
-fastTab:AddLabel("  🔴 250-400ms = 200 reps/s")
-fastTab:AddLabel("  ⚫ >400ms = 50 reps/s")
-
 local function calculateSpeedByPing(ping)
     if ping < 80 then
-        return 800, "🟢 Excelente"
+        return 1200, 
     elseif ping < 150 then
-        return 600, "🟡 Muy Bueno"
+        return 700, 
     elseif ping < 250 then
-        return 400, "🟠 Bueno"
+        return 659, 
     elseif ping < 400 then
-        return 200, "🔴 Lento"
+        return 200, 
     else
         return 50, "⚫ Muy Lento"
     end
