@@ -1,6 +1,6 @@
 --[[
     Muscle Legends - Farm UI con eleriumv2
-    Fast Rep + Fast Rebirth (misma pestaña)
+    Fast Rep Adaptativo (varía según ping) + Fast Rebirth (misma pestaña)
 ]]
 
 -- =========================================================
@@ -45,7 +45,7 @@ end
 -- =========================================================
 local window = library:AddWindow("Muscle Legends - Farm ⚡", {
     main_color = Color3.fromRGB(0, 150, 255),
-    min_size = Vector2.new(550, 700),
+    min_size = Vector2.new(550, 750),
     can_resize = true,
 })
 
@@ -100,69 +100,81 @@ mainTab:AddLabel("Made by horarybrech")
 -- =========================================================
 -- FAST FARM + FAST REBIRTH TAB (MISMA PESTAÑA)
 -- =========================================================
-fastTab:AddLabel("⚡ FAST REP:")
+fastTab:AddLabel("⚡ FAST REP (Adaptativo por Ping):")
 
 -- Fast Rep Data
 local fastRepData = {
     Running = false,
     SendRate = 400,
-    MaxSendRate = 800,
+    CurrentPing = 0,
+    LastPingCheck = 0,
     MaxBurst = 32,
     SendTokens = 0,
     LastLoopAt = os.clock(),
-    CurrentPing = 0,
-    LastPingCheck = 0,
-    PingControl = true
+    MinReps = 50,
+    MaxReps = 800,
+    AdaptiveMode = true
 }
 
 local fastRepStatus = fastTab:AddLabel("Status: Inactivo")
+local pingInfoLabel = fastTab:AddLabel("Ping: -- ms | Speed: -- reps/s")
 
-fastTab:AddTextBox("Max reps/s:", function(text)
-    local num = tonumber(text)
-    if num and num > 0 then
-        fastRepData.MaxSendRate = math.clamp(num, 100, 2000)
-    end
-end, {clear = false})
-
-local pingControlSwitch = fastTab:AddSwitch("Ping Control (Auto Speed)", function(state)
-    fastRepData.PingControl = state
+-- Control adaptativo del ping
+fastTab:AddSwitch("Modo Adaptativo (Auto por Ping)", function(state)
+    fastRepData.AdaptiveMode = state
 end)
-pingControlSwitch:Set(true)
+fastRepData.AdaptiveMode = true
+
+fastTab:AddLabel("")
+fastTab:AddLabel("📊 Velocidades por Ping:")
+fastTab:AddLabel("  🟢 <80ms = 800 reps/s")
+fastTab:AddLabel("  🟡 80-150ms = 600 reps/s")
+fastTab:AddLabel("  🟠 150-250ms = 400 reps/s")
+fastTab:AddLabel("  🔴 250-400ms = 200 reps/s")
+fastTab:AddLabel("  ⚫ >400ms = 50 reps/s")
+
+local function calculateSpeedByPing(ping)
+    if ping < 80 then
+        return 800, "🟢 Excelente"
+    elseif ping < 150 then
+        return 600, "🟡 Muy Bueno"
+    elseif ping < 250 then
+        return 400, "🟠 Bueno"
+    elseif ping < 400 then
+        return 200, "🔴 Lento"
+    else
+        return 50, "⚫ Muy Lento"
+    end
+end
 
 local fastRepWorker = function()
     fastRepData.LastLoopAt = os.clock()
+    
     while fastRepData.Running do
         local now = os.clock()
         local elapsed = math.min(0.1, now - fastRepData.LastLoopAt)
         fastRepData.LastLoopAt = now
 
+        -- Obtener ping cada 0.5 segundos
         if tick() - fastRepData.LastPingCheck > 0.5 then
             fastRepData.CurrentPing = networkStats:GetValue()
             fastRepData.LastPingCheck = tick()
 
-            if fastRepData.PingControl then
-                local ping = fastRepData.CurrentPing
-                local targetSpeed
-                if ping < 80 then
-                    targetSpeed = 800
-                elseif ping < 150 then
-                    targetSpeed = 600
-                elseif ping < 250 then
-                    targetSpeed = 400
-                elseif ping < 400 then
-                    targetSpeed = 200
-                else
-                    targetSpeed = 100
-                end
-                fastRepData.SendRate = targetSpeed
+            -- Calcular velocidad según ping (ADAPTATIVO)
+            if fastRepData.AdaptiveMode then
+                local speed, status = calculateSpeedByPing(fastRepData.CurrentPing)
+                fastRepData.SendRate = speed
+                pingInfoLabel.Text = status .. " | Ping: " .. math.floor(fastRepData.CurrentPing) .. " ms | Speed: " .. speed .. " reps/s"
             end
         end
 
+        -- Generar tokens para enviar requests
         fastRepData.SendTokens = math.min(
             fastRepData.MaxBurst,
             fastRepData.SendTokens + fastRepData.SendRate * elapsed
         )
 
+        -- Calcular ráfaga máxima
         local burstLimit = math.max(1, math.min(
             fastRepData.MaxBurst,
             math.ceil(fastRepData.SendRate * 0.05)
@@ -170,6 +182,7 @@ local fastRepWorker = function()
 
         local sendCount = math.min(math.floor(fastRepData.SendTokens), burstLimit)
 
+        -- Enviar requests
         for i = 1, sendCount do
             pcall(function()
                 muscleEvent:FireServer("rep")
@@ -178,23 +191,27 @@ local fastRepWorker = function()
 
         fastRepData.SendTokens = fastRepData.SendTokens - sendCount
 
-        fastRepStatus.Text = "⚡ " .. math.floor(fastRepData.SendRate) ..
-            " reps/s | " .. math.floor(fastRepData.CurrentPing) .. " ms"
+        fastRepStatus.Text = "⚡ Fast Rep Activo | " .. math.floor(fastRepData.SendRate) .. " reps/s"
 
         services.RunService.Heartbeat:Wait()
     end
+    
+    fastRepStatus.Text = "Status: Inactivo"
+    pingInfoLabel.Text = "Ping: -- ms | Speed: -- reps/s"
 end
 
-local fastRepSwitch = fastTab:AddSwitch("Fast Rep ⚡", function(state)
+local fastRepSwitch = fastTab:AddSwitch("Fast Rep ⚡ (ACTIVAR)", function(state)
     fastRepData.Running = state
     if state then
         fastRepData.SendRate = 400
         fastRepData.SendTokens = 0
         fastRepData.LastLoopAt = os.clock()
         fastRepData.LastPingCheck = tick()
+        fastRepStatus.Text = "⚡ Fast Rep Iniciando..."
         task.spawn(fastRepWorker)
     else
         fastRepStatus.Text = "Status: Inactivo"
+        pingInfoLabel.Text = "Ping: -- ms | Speed: -- reps/s"
     end
 end)
 
@@ -280,7 +297,7 @@ local fastRebirthWorker = function()
     fastRebirthData.IsWorking = false
 end
 
-local fastRebirthSwitch = fastTab:AddSwitch("Fast Rebirth 🔄", function(state)
+local fastRebirthSwitch = fastTab:AddSwitch("Fast Rebirth 🔄 (ACTIVAR)", function(state)
     fastRebirthData.Running = state
     if state then
         rebirthStatus.Text = "Status: 🔄 Iniciando..."
@@ -297,12 +314,13 @@ end)
 -- =========================================================
 -- STATS TAB
 -- =========================================================
-statsTab:AddLabel("Progreso:")
+statsTab:AddLabel("📊 Progreso:")
 statsTab:AddLabel("")
 
 local strengthLabel = statsTab:AddLabel("💪 Strength: 0")
 local rebirthLabel = statsTab:AddLabel("🔄 Rebirths: 0")
 local killsLabel = statsTab:AddLabel("🎯 Kills: 0")
+local pingLabel = statsTab:AddLabel("📡 Ping: -- ms")
 
 local startTime = tick()
 local timerLabel = statsTab:AddLabel("⏱️ Tiempo: 00:00:00")
@@ -318,6 +336,8 @@ task.spawn(function()
             killsLabel.Text = "🎯 Kills: " .. tostring(kills.Value)
         end
 
+        pingLabel.Text = "📡 Ping: " .. math.floor(networkStats:GetValue()) .. " ms"
+
         local elapsed = tick() - startTime
         local hours = math.floor(elapsed / 3600)
         local minutes = math.floor((elapsed % 3600) / 60)
@@ -332,3 +352,5 @@ end)
 -- MOSTRAR VENTANA
 -- =========================================================
 print("✅ Muscle Legends Farm UI cargado")
+print("⚡ Fast Rep con adaptación automática según ping")
+print("🔄 Fast Rebirth con target personalizable")
