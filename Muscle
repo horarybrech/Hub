@@ -1,0 +1,339 @@
+--[[
+    Muscle Legends - Farm UI con Fast Rep
+    Solo farming legit - Sin PvP, sin auto-kill, sin trampas
+]]
+
+local services = {
+    Players = game:GetService("Players"),
+    ReplicatedStorage = game:GetService("ReplicatedStorage"),
+    Workspace = workspace,
+    RunService = game:GetService("RunService"),
+    UserInputService = game:GetService("UserInputService"),
+    VirtualInputManager = game:GetService("VirtualInputManager"),
+    Stats = game:GetService("Stats")
+}
+
+local utils = {}
+utils.runtime = {}
+
+for _, connection in ipairs(_G.FarmUIConnections or {}) do
+    pcall(function() connection:Disconnect() end)
+end
+_G.FarmUIConnections = {}
+
+function utils.connect(signal, callback)
+    local connection = signal:Connect(callback)
+    table.insert(_G.FarmUIConnections, connection)
+    return connection
+end
+
+utils.playerData = {
+    Player = services.Players.LocalPlayer,
+    Character = services.Players.LocalPlayer.Character,
+    Humanoid = nil,
+    Backpack = services.Players.LocalPlayer:WaitForChild("Backpack")
+}
+utils.playerData.Humanoid = utils.playerData.Character and utils.playerData.Character:FindFirstChildOfClass("Humanoid")
+
+utils.remotes = {
+    ChangeSpeedSize = services.ReplicatedStorage.rEvents.changeSpeedSizeRemote,
+    MuscleEvent = utils.playerData.Player.muscleEvent,
+    RebirthRemote = services.ReplicatedStorage.rEvents.rebirthRemote
+}
+
+function utils.formatNumber(n)
+    if n >= 1e18 then return string.format("%.1fqi", n / 1e18)
+    elseif n >= 1e15 then return string.format("%.1fqa", n / 1e15)
+    elseif n >= 1e12 then return string.format("%.1ft", n / 1e12)
+    elseif n >= 1e9 then return string.format("%.1fb", n / 1e9)
+    elseif n >= 1e6 then return string.format("%.1fm", n / 1e6)
+    elseif n >= 1e3 then return string.format("%.1fk", n / 1e3)
+    else return tostring(n) end
+end
+
+function utils.formatWithCommas(n)
+    local formatted = tostring(math.floor(n))
+    while true do
+        formatted, _ = formatted:gsub("^(-?%d+)(%d%d%d)", "%1,%2")
+        if _ == 0 then break end
+    end
+    return formatted
+end
+
+utils.library = loadstring(game:HttpGet("https://raw.githubusercontent.com/rodriguezberiticajuliocesar-wq/SilenceScripts/refs/heads/main/libraries/eleriumv2.luau?cache=" .. tostring(os.time()), true))()
+
+utils.window = utils.library:AddWindow("Muscle Legends - Farm UI ⚡", {
+    main_color = Color3.fromRGB(0, 150, 255),
+    min_size = Vector2.new(550, 700),
+    can_resize = true,
+})
+
+local tabs = {
+    main = utils.window:AddTab("Main"),
+    fastfarm = utils.window:AddTab("⚡ Fast Farm"),
+    farming = utils.window:AddTab("Farming"),
+    exercises = utils.window:AddTab("Exercises"),
+    teleport = utils.window:AddTab("Teleports"),
+    stats = utils.window:AddTab("Stats")
+}
+
+for _, tab in pairs(tabs) do
+    tab.runtime = {}
+end
+
+-- MAIN TAB
+tabs.main:AddLabel("Player Settings:")
+
+tabs.main.Settings = {
+    Size = {Value = 2, Enabled = false},
+    Speed = {Value = 120, Enabled = false}
+}
+
+tabs.main:AddTextBox("Size:", function(text)
+    text = string.gsub(text, "%s+", "")
+    if tonumber(text) and tonumber(text) > 0 then
+        tabs.main.Settings.Size.Value = tonumber(text)
+    end
+end, {clear = false})
+
+tabs.main:AddSwitch("Set Size", function(bool)
+    tabs.main.Settings.Size.Enabled = bool
+end)
+
+task.spawn(function()
+    while _G.FarmUIConnections do
+        if tabs.main.Settings.Size.Enabled and utils.playerData.Character and utils.playerData.Humanoid then
+            pcall(function()
+                utils.remotes.ChangeSpeedSize:InvokeServer("changeSize", tabs.main.Settings.Size.Value)
+            end)
+        end
+        task.wait(0.01)
+    end
+end)
+
+tabs.main:AddTextBox("Speed:", function(text)
+    text = string.gsub(text, "%s+", "")
+    if tonumber(text) and tonumber(text) > 0 then
+        tabs.main.Settings.Speed.Value = tonumber(text)
+    end
+end, {clear = false})
+
+tabs.main:AddSwitch("Set Speed", function(bool)
+    tabs.main.Settings.Speed.Enabled = bool
+end)
+
+task.spawn(function()
+    while _G.FarmUIConnections do
+        if tabs.main.Settings.Speed.Enabled and utils.playerData.Character and utils.playerData.Humanoid then
+            pcall(function()
+                utils.remotes.ChangeSpeedSize:InvokeServer("changeSpeed", tabs.main.Settings.Speed.Value)
+            end)
+        end
+        task.wait(0.01)
+    end
+end)
+
+-- FAST FARM TAB
+tabs.fastfarm:AddLabel("⚡ Fast Rep (Adaptativo):")
+
+tabs.fastfarm.FastRepData = {
+    Running = false,
+    WorkerActive = false,
+    SendRate = 400,
+    MaxSendRate = 800,
+    MinSendRate = 100,
+    MaxBurst = 32,
+    SendTokens = 0,
+    LastLoopAt = os.clock(),
+    CurrentPing = 0,
+    LastPingCheck = 0,
+    PingControl = true
+}
+
+local networkStats = services.Stats.Network.ServerStatsItem["Data Ping"]
+
+tabs.fastfarm.FastRepStatus = tabs.fastfarm:AddLabel("Status: Inactivo")
+tabs.fastfarm.FastRepStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+
+tabs.fastfarm.FastRepWorkerLoop = function()
+    tabs.fastfarm.FastRepData.LastLoopAt = os.clock()
+    while _G.FarmUIConnections and tabs.fastfarm.FastRepData.Running do
+        local now = os.clock()
+        local elapsed = math.min(0.1, now - tabs.fastfarm.FastRepData.LastLoopAt)
+        tabs.fastfarm.FastRepData.LastLoopAt = now
+        
+        if tick() - tabs.fastfarm.FastRepData.LastPingCheck > 0.5 then
+            tabs.fastfarm.FastRepData.CurrentPing = networkStats:GetValue()
+            tabs.fastfarm.FastRepData.LastPingCheck = tick()
+            
+            if tabs.fastfarm.FastRepData.PingControl then
+                local ping = tabs.fastfarm.FastRepData.CurrentPing
+                local targetSpeed
+                if ping < 80 then
+                    targetSpeed = 800
+                elseif ping < 150 then
+                    targetSpeed = 600
+                elseif ping < 250 then
+                    targetSpeed = 400
+                elseif ping < 400 then
+                    targetSpeed = 200
+                else
+                    targetSpeed = 100
+                end
+                tabs.fastfarm.FastRepData.SendRate = targetSpeed
+            end
+        end
+        
+        tabs.fastfarm.FastRepData.SendTokens = math.min(
+            tabs.fastfarm.FastRepData.MaxBurst,
+            tabs.fastfarm.FastRepData.SendTokens + tabs.fastfarm.FastRepData.SendRate * elapsed
+        )
+        
+        local burstLimit = math.max(1, math.min(
+            tabs.fastfarm.FastRepData.MaxBurst,
+            math.ceil(tabs.fastfarm.FastRepData.SendRate * 0.05)
+        ))
+        
+        local sendCount = math.min(math.floor(tabs.fastfarm.FastRepData.SendTokens), burstLimit)
+        
+        for i = 1, sendCount do
+            pcall(function()
+                utils.remotes.MuscleEvent:FireServer("rep")
+            end)
+        end
+        
+        tabs.fastfarm.FastRepData.SendTokens = tabs.fastfarm.FastRepData.SendTokens - sendCount
+        
+        tabs.fastfarm.FastRepStatus.Text = "⚡ " .. math.floor(tabs.fastfarm.FastRepData.SendRate) ..
+            " reps/s | " .. math.floor(tabs.fastfarm.FastRepData.CurrentPing) .. " ms"
+        tabs.fastfarm.FastRepStatus.TextColor3 = Color3.fromRGB(80, 255, 120)
+        
+        services.RunService.Heartbeat:Wait()
+    end
+    tabs.fastfarm.FastRepData.WorkerActive = false
+end
+
+tabs.fastfarm:AddTextBox("Max reps/s:", function(text)
+    local num = tonumber(text)
+    if num and num > 0 then
+        tabs.fastfarm.FastRepData.MaxSendRate = math.clamp(num, 100, 2000)
+        tabs.fastfarm.FastRepData.SendRate = math.min(tabs.fastfarm.FastRepData.SendRate, tabs.fastfarm.FastRepData.MaxSendRate)
+    end
+end, {clear = false})
+
+tabs.fastfarm:AddSwitch("Ping Control (Auto Speed)", function(state)
+    tabs.fastfarm.FastRepData.PingControl = state
+end):Set(true)
+
+tabs.fastfarm.FastRepSwitch = tabs.fastfarm:AddSwitch("Fast Rep ⚡", function(state)
+    tabs.fastfarm.FastRepData.Running = state
+    if state then
+        tabs.fastfarm.FastRepData.SendRate = 400
+        tabs.fastfarm.FastRepData.SendTokens = 0
+        tabs.fastfarm.FastRepData.LastLoopAt = os.clock()
+        tabs.fastfarm.FastRepData.LastPingCheck = tick()
+        
+        if not tabs.fastfarm.FastRepData.WorkerActive then
+            tabs.fastfarm.FastRepData.WorkerActive = true
+            task.spawn(tabs.fastfarm.FastRepWorkerLoop)
+        end
+    else
+        tabs.fastfarm.FastRepStatus.Text = "Status: Inactivo"
+        tabs.fastfarm.FastRepStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+    end
+end)
+
+tabs.fastfarm:AddLabel("")
+tabs.fastfarm:AddLabel("⚡ 400-800 reps/s adaptativo")
+tabs.fastfarm:AddLabel("📊 Auto-ajusta según ping")
+
+-- FARMING TAB
+tabs.farming:AddLabel("Auto Rebirth:")
+
+tabs.farming.RebirthData = {
+    Label = tabs.farming:AddLabel("Rebirths: 0"),
+    TargetLabel = tabs.farming:AddLabel("Target: None"),
+    Rebirths = utils.playerData.Player.leaderstats:WaitForChild("Rebirths"),
+    TargetRebirths = 0,
+    IsAutoRebirthing = false
+}
+
+tabs.farming:AddTextBox("Target Rebirths:", function(text)
+    if tonumber(text) and tonumber(text) >= 0 then
+        tabs.farming.RebirthData.TargetRebirths = tonumber(text)
+    end
+end, {clear = false})
+
+tabs.farming.RebirthData.Switch = tabs.farming:AddSwitch("Auto Rebirth", function(enabled)
+    if enabled and tabs.farming.RebirthData.TargetRebirths > 0 and tabs.farming.RebirthData.Rebirths.Value < tabs.farming.RebirthData.TargetRebirths then
+        tabs.farming.RebirthData.IsAutoRebirthing = true
+        task.spawn(function()
+            while _G.FarmUIConnections and tabs.farming.RebirthData.IsAutoRebirthing and tabs.farming.RebirthData.Rebirths.Value < tabs.farming.RebirthData.TargetRebirths do
+                pcall(function()
+                    utils.remotes.RebirthRemote:InvokeServer("rebirthRequest")
+                end)
+                task.wait(0.05)
+            end
+            tabs.farming.RebirthData.IsAutoRebirthing = false
+            tabs.farming.RebirthData.Switch:Set(false)
+        end)
+    else
+        tabs.farming.RebirthData.IsAutoRebirthing = false
+    end
+end)
+
+task.spawn(function()
+    while _G.FarmUIConnections do
+        tabs.farming.RebirthData.Label.Text = "Rebirths: " .. utils.formatWithCommas(tabs.farming.RebirthData.Rebirths.Value)
+        tabs.farming.RebirthData.TargetLabel.Text = "Target: " .. utils.formatWithCommas(tabs.farming.RebirthData.TargetRebirths)
+        task.wait(0.1)
+    end
+end)
+
+tabs.farming:AddLabel("")
+tabs.farming:AddLabel("Auto Rep Normal:")
+
+tabs.farming.RepData = {Active = false}
+
+tabs.farming.RepSwitch = tabs.farming:AddSwitch("Start Rep", function(bool)
+    tabs.farming.RepData.Active = bool
+end)
+
+task.spawn(function()
+    while _G.FarmUIConnections do
+        if tabs.farming.RepData.Active and utils.playerData.Character and utils.playerData.Humanoid then
+            pcall(function()
+                utils.remotes.MuscleEvent:FireServer("rep")
+            end)
+        end
+        task.wait(0.1)
+    end
+end)
+
+-- EXERCISES TAB
+tabs.exercises:AddLabel("Hand Tools:")
+
+tabs.exercises.ExerciseData = {
+    SelectedTool = nil,
+    AutoFarm = false
+}
+
+tabs.exercises.ToolDropdown = tabs.exercises:AddDropdown("Select Tool", function(selection)
+    tabs.exercises.ExerciseData.SelectedTool = selection
+end)
+
+for _, tool in ipairs({"Weight", "Pushups", "Situps", "Handstands"}) do
+    tabs.exercises.ToolDropdown:Add(tool)
+end
+
+tabs.exercises.ToolSwitch = tabs.exercises:AddSwitch("Auto Tool", function(enabled)
+    tabs.exercises.ExerciseData.AutoFarm = enabled
+
+    if enabled then
+        task.spawn(function()
+            while _G.FarmUIConnections and tabs.exercises.ExerciseData.AutoFarm do
+                if utils.playerData.Character and tabs.exercises.ExerciseData.SelectedTool then
+                    local toolName = tabs.exercises.ExerciseData.SelectedTool
+
+                    if not utils.playerData.Character:FindFirst*_
+
