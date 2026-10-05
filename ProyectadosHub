@@ -1,5 +1,5 @@
 --[[
-    Proyectados Hub - Farming & Boss Fusion
+    Proyectados Hub - Farming, Rebirth & Boss (Versión Horarybrech)
 ]]
 
 local services = {
@@ -48,13 +48,16 @@ utils.playerData = {
 
 utils.playerData.Humanoid = utils.playerData.Character and utils.playerData.Character:FindFirstChildOfClass("Humanoid")
 
+local rEvents = services.ReplicatedStorage:WaitForChild("rEvents", 10)
 utils.remotes = {
-    ChangeSpeedSize = services.ReplicatedStorage.rEvents:WaitForChild("changeSpeedSizeRemote"),
-    MuscleEvent = utils.playerData.Player:WaitForChild("muscleEvent")
+    ChangeSpeedSize = rEvents and rEvents:WaitForChild("changeSpeedSizeRemote"),
+    MuscleEvent = utils.playerData.Player:WaitForChild("muscleEvent"),
+    QuestsEvent = rEvents and rEvents:FindFirstChild("questsEvent"),
+    PetEvolution = rEvents and (rEvents:FindFirstChild("petEvolutionEvent") or rEvents:FindFirstChild("fusePetsEvent"))
 }
 
 -- ==========================================
--- Funciones Base HonenxWhite
+-- Funciones Base Horarybrech
 -- ==========================================
 function utils.formatNumber(n)
     if n >= 1e18 then return string.format("%.1fqi", n / 1e18)
@@ -108,7 +111,6 @@ function deleteBodyMovementScript()
 end
 deleteBodyMovementScript()
 
--- Variables Base Silence
 local lp = {
     player = services.Players.LocalPlayer,
     userid = services.Players.LocalPlayer.UserId,
@@ -340,7 +342,7 @@ local function formatCurrentStat(value)
 end
 
 -- ==========================================
--- HONENXWHITE: FARMING TAB (CON AUTOLIFT Y VELOCIDAD PERSONALIZABLE)
+-- HORARYBRECH: FARMING TAB (ESTABLE)
 -- ==========================================
 tabs.farming:AddLabel("AutoLift Configuration:")
 tabs.farming.AutoLiftSpeed = 0.06
@@ -352,7 +354,7 @@ tabs.farming:AddTextBox("Velocidad AutoLift (ej: 0.06):", function(text)
 end, {clear = false})
 
 tabs.farming.AutoLiftActive = false
-tabs.farming:AddSwitch("Activar AutoLift (Con Movimiento y Animación)", function(state)
+tabs.farming.AutoLiftSwitch = tabs.farming:AddSwitch("Activar AutoLift (Con Movimiento y Animación)", function(state)
     tabs.farming.AutoLiftActive = state
     if state then
         task.spawn(function()
@@ -378,44 +380,6 @@ tabs.farming:AddSwitch("Activar AutoLift (Con Movimiento y Animación)", functio
     end
 end)
 
-tabs.farming:AddLabel("")
-tabs.farming:AddLabel("Rebirths:")
-tabs.farming.RebirthData = {
-    Label = tabs.farming:AddLabel("Rebirths: 0"),
-    TargetLabel = tabs.farming:AddLabel("Target: None"),
-    Rebirths = utils.playerData.Player.leaderstats:WaitForChild("Rebirths"),
-    TargetRebirths = 0,
-    IsAutoRebirthing = false
-}
-
-tabs.farming:AddTextBox("Set Rebirth Target (Required):", function(text)
-    if tonumber(text) and tonumber(text) >= 0 then tabs.farming.RebirthData.TargetRebirths = tonumber(text) end
-end)
-
-tabs.farming.RebirthData.Switch = tabs.farming:AddSwitch("Auto Rebirth", function(enabled)
-    if enabled and tabs.farming.RebirthData.TargetRebirths > 0 and tabs.farming.RebirthData.Rebirths.Value < tabs.farming.RebirthData.TargetRebirths then
-        tabs.farming.RebirthData.IsAutoRebirthing = true
-        task.spawn(function()
-            while utils.isCurrent() and tabs.farming.RebirthData.IsAutoRebirthing and tabs.farming.RebirthData.Rebirths.Value < tabs.farming.RebirthData.TargetRebirths do
-                services.ReplicatedStorage.rEvents.rebirthRemote:InvokeServer("rebirthRequest")
-                task.wait(0.05)
-            end
-            tabs.farming.RebirthData.IsAutoRebirthing = false
-            tabs.farming.RebirthData.Switch:Set(false)
-        end)
-    else
-        tabs.farming.RebirthData.IsAutoRebirthing = false
-    end
-end)
-
-task.spawn(function()
-    while utils.isCurrent() and true do
-        tabs.farming.RebirthData.Label.Text = "Rebirths: " .. utils.formatWithCommas(tabs.farming.RebirthData.Rebirths.Value)
-        tabs.farming.RebirthData.TargetLabel.Text = "Target Rebirths: " .. utils.formatWithCommas(tabs.farming.RebirthData.TargetRebirths)
-        task.wait(0.01)
-    end
-end)
-
 tabs.farming.SizeData = {Active = false}
 tabs.farming.SizeSwitch = tabs.farming:AddSwitch("Auto Size 1", function(bool) tabs.farming.SizeData.Active = bool end)
 tabs.farming.SizeSwitch:Set(false)
@@ -426,39 +390,6 @@ task.spawn(function()
             utils.remotes.ChangeSpeedSize:InvokeServer("changeSize", 1)
         end
         task.wait(0.01)
-    end
-end)
-
-tabs.farming.KingData = {TargetPosition = CFrame.new(-8665.4, 17.21, -5792.9), TeleportActive = false}
-tabs.farming.KingSwitch = tabs.farming:AddSwitch("Auto King", function(enabled)
-    tabs.farming.KingData.TeleportActive = enabled
-end)
-
-task.spawn(function()
-    while utils.isCurrent() and true do
-        if tabs.farming.KingData.TeleportActive then
-            if not utils.playerData.Character or not utils.playerData.Character:FindFirstChildOfClass("Humanoid") then
-                utils.playerData.Player.CharacterAdded:Wait()
-                utils.playerData.Character = utils.playerData.Player.Character
-                task.wait(2)
-            end
-            if not utils.playerData.Humanoid or utils.playerData.Humanoid.Health <= 0 then
-                repeat
-                    task.wait(0.5)
-                    utils.playerData.Character = utils.playerData.Player.Character
-                    utils.playerData.Humanoid = utils.playerData.Character and utils.playerData.Character:FindFirstChildOfClass("Humanoid")
-                until utils.playerData.Character and utils.playerData.Humanoid and utils.playerData.Humanoid.Health > 0
-                task.wait(1)
-            end
-            if utils.playerData.Character and utils.playerData.Character:FindFirstChild("HumanoidRootPart") then
-                if (utils.playerData.Character.HumanoidRootPart.Position - tabs.farming.KingData.TargetPosition.Position).magnitude > 5 then
-                    pcall(function()
-                        utils.playerData.Character.HumanoidRootPart.CFrame = tabs.farming.KingData.TargetPosition
-                    end)
-                end
-            end
-        end
-        task.wait(0.05)
     end
 end)
 
@@ -956,7 +887,6 @@ tabs.configs:AddLabel("⚙️ Automatización Rápida:")
 
 tabs.configs:AddSwitch("Rebirth in Industrial", function(state)
     if state then
-        -- 1. Teletransporte al Industrial Lift
         pcall(function()
             local char = lp.player.Character or lp.player.CharacterAdded:Wait()
             local hrp = char:WaitForChild("HumanoidRootPart")
@@ -969,11 +899,9 @@ tabs.configs:AddSwitch("Rebirth in Industrial", function(state)
             services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
         end)
         task.wait(0.5)
-        -- 2. Activar Fast Rep (en Full Farm)
         if tabs.fullFarm and tabs.fullFarm.FastRepToggle then
             tabs.fullFarm.FastRepToggle:Set(true)
         end
-        -- 3. Activar Fast Rebirth V2
         if tabs.fullRebirth and tabs.fullRebirth.FastRebirthV2Toggle then
             tabs.fullRebirth.FastRebirthV2Toggle:Set(true)
         end
@@ -989,7 +917,6 @@ end)
 
 tabs.configs:AddSwitch("Rebirth Overcharge", function(state)
     if state then
-        -- 1. Teletransporte al Overcharged Lift
         pcall(function()
             local char = lp.player.Character or lp.player.CharacterAdded:Wait()
             local hrp = char:WaitForChild("HumanoidRootPart")
@@ -1002,11 +929,9 @@ tabs.configs:AddSwitch("Rebirth Overcharge", function(state)
             services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
         end)
         task.wait(0.5)
-        -- 2. Activar Fast Rep (en Full Farm)
         if tabs.fullFarm and tabs.fullFarm.FastRepToggle then
             tabs.fullFarm.FastRepToggle:Set(true)
         end
-        -- 3. Activar Fast Rebirth V2
         if tabs.fullRebirth and tabs.fullRebirth.FastRebirthV2Toggle then
             tabs.fullRebirth.FastRebirthV2Toggle:Set(true)
         end
@@ -1021,9 +946,9 @@ tabs.configs:AddSwitch("Rebirth Overcharge", function(state)
 end)
 
 -- ==========================================
--- FULL REBIRTH TAB (FAST REBIRTH V2 & CALCULADORA)
+-- FULL REBIRTH TAB (Incluye Auto King)
 -- ==========================================
-tabs.fullRebirth:AddLabel("🔄 Fast Rebirth V2 & Young0x Calculadora (Unificado):")
+tabs.fullRebirth:AddLabel("🔄 Fast Rebirth V2 & Horarybrech Calculadora (Unificado):")
 
 tabs.fullRebirth.TargetRebirths = 0
 tabs.fullRebirth:AddTextBox("Meta Global de Rebirths (0 = Infinito):", function(val)
@@ -1182,70 +1107,44 @@ tabs.fullRebirth.FastRebirthV2Toggle = tabs.fullRebirth:AddSwitch("Fast Rebirth 
     end
 end)
 
+-- Auto King
+tabs.fullRebirth:AddLabel("")
+tabs.fullRebirth:AddLabel("👑 Auto King:")
+tabs.fullRebirth.KingData = {TargetPosition = CFrame.new(-8665.4, 17.21, -5792.9), TeleportActive = false}
+tabs.fullRebirth.KingSwitch = tabs.fullRebirth:AddSwitch("Auto King", function(enabled)
+    tabs.fullRebirth.KingData.TeleportActive = enabled
+end)
+
 task.spawn(function()
-    local leaderstats = utils.playerData.Player:WaitForChild("leaderstats")
-    local rebirthsStat = leaderstats:WaitForChild("Rebirths")
-    
-    local lastRebirthCount = rebirthsStat.Value
-    local lastRebirthTime = tick()
-    local timeRecords = {} 
-    local maxRecords = 5
-    
-    while utils.isCurrent() do
-        local currentRebirths = rebirthsStat.Value
-        
-        if currentRebirths > lastRebirthCount then
-            local timeTaken = tick() - lastRebirthTime
-            table.insert(timeRecords, timeTaken)
-            if #timeRecords > maxRecords then
-                table.remove(timeRecords, 1)
+    while utils.isCurrent() and true do
+        if tabs.fullRebirth.KingData.TeleportActive then
+            if not utils.playerData.Character or not utils.playerData.Character:FindFirstChildOfClass("Humanoid") then
+                utils.playerData.Player.CharacterAdded:Wait()
+                utils.playerData.Character = utils.playerData.Player.Character
+                task.wait(2)
             end
-            lastRebirthCount = currentRebirths
-            lastRebirthTime = tick()
+            if not utils.playerData.Humanoid or utils.playerData.Humanoid.Health <= 0 then
+                repeat
+                    task.wait(0.5)
+                    utils.playerData.Character = utils.playerData.Player.Character
+                    utils.playerData.Humanoid = utils.playerData.Character and utils.playerData.Character:FindFirstChildOfClass("Humanoid")
+                until utils.playerData.Character and utils.playerData.Humanoid and utils.playerData.Humanoid.Health > 0
+                task.wait(1)
+            end
+            if utils.playerData.Character and utils.playerData.Character:FindFirstChild("HumanoidRootPart") then
+                if (utils.playerData.Character.HumanoidRootPart.Position - tabs.fullRebirth.KingData.TargetPosition.Position).magnitude > 5 then
+                    pcall(function()
+                        utils.playerData.Character.HumanoidRootPart.CFrame = tabs.fullRebirth.KingData.TargetPosition
+                    end)
+                end
+            end
         end
-        
-        if currentRebirths < lastRebirthCount then
-            lastRebirthCount = currentRebirths
-            timeRecords = {}
-        end
-        
-        local missing = math.max(0, tabs.fullRebirth.TargetRebirths - currentRebirths)
-        tabs.fullRebirth.MissingLabel.Text = "Rebirths Faltantes: " .. utils.formatWithCommas(missing)
-        
-        if tabs.fullRebirth.TargetRebirths <= 0 then
-            tabs.fullRebirth.AvgTimeLabel.Text = "Velocidad: Ingresa una meta arriba"
-            tabs.fullRebirth.EtaLabel.Text = "Tiempo Estimado: N/A"
-            tabs.fullRebirth.EtaLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        elseif missing == 0 and tabs.fullRebirth.TargetRebirths > 0 then
-            tabs.fullRebirth.AvgTimeLabel.Text = "Velocidad: Meta alcanzada"
-            tabs.fullRebirth.EtaLabel.Text = "Tiempo Estimado: Completado!"
-            tabs.fullRebirth.EtaLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
-        elseif #timeRecords > 0 then
-            local sum = 0
-            for _, t in ipairs(timeRecords) do sum = sum + t end
-            local avgTime = sum / #timeRecords
-            
-            tabs.fullRebirth.AvgTimeLabel.Text = string.format("Velocidad: 1 Rebirth cada %.1f seg", avgTime)
-            
-            local totalSecondsRemaining = missing * avgTime
-            local hours = math.floor(totalSecondsRemaining / 3600)
-            local minutes = math.floor((totalSecondsRemaining % 3600) / 60)
-            local seconds = math.floor(totalSecondsRemaining % 60)
-            
-            tabs.fullRebirth.EtaLabel.Text = string.format("Tiempo Estimado: %dh %dm %ds", hours, minutes, seconds)
-            tabs.fullRebirth.EtaLabel.TextColor3 = Color3.fromRGB(80, 200, 255)
-        else
-            tabs.fullRebirth.AvgTimeLabel.Text = "Velocidad: Esperando tu primer Rebirth..."
-            tabs.fullRebirth.EtaLabel.Text = "Tiempo Estimado: Calculando..."
-            tabs.fullRebirth.EtaLabel.TextColor3 = Color3.fromRGB(255, 200, 80)
-        end
-        
-        task.wait(1)
+        task.wait(0.05)
     end
 end)
 
 -- ==========================================
--- HONENXWHITE: BOSS TAB
+-- BOSS TAB
 -- ==========================================
 tabs.boss:AddLabel("Boss Farming:")
 tabs.boss.StatusLabel = tabs.boss:AddLabel("Status: Waiting for Boss")
@@ -1382,9 +1281,8 @@ end
 tabs.boss.pauseTraining = function()
     if tabs.boss.Data.TrainingSnapshot then return end
     tabs.boss.Data.TrainingSnapshot = {
-        Rebirth = tabs.farming.RebirthData.IsAutoRebirthing,
         Size = tabs.farming.SizeData.Active,
-        King = tabs.farming.KingData.TeleportActive,
+        King = tabs.fullRebirth.KingData.TeleportActive,
         Tool = tabs.farming.ExerciseData.AutoFarm,
         Squat = tabs.farming.MachineExerciseData.Squat.Running,
         Lift = tabs.farming.MachineExerciseData.Lift.Running,
@@ -1396,9 +1294,8 @@ tabs.boss.pauseTraining = function()
         tabs.boss.Data.TrainingSnapshot.Configs[config.name] = tabs.farming.ActiveConfigs[config.name] == true
         if tabs.farming.ActiveConfigs[config.name] and config.Switch then config.Switch:Set(false) end
     end
-    if tabs.boss.Data.TrainingSnapshot.Rebirth then tabs.farming.RebirthData.Switch:Set(false) end
     if tabs.boss.Data.TrainingSnapshot.Size then tabs.farming.SizeSwitch:Set(false) end
-    if tabs.boss.Data.TrainingSnapshot.King then tabs.farming.KingSwitch:Set(false) end
+    if tabs.boss.Data.TrainingSnapshot.King then tabs.fullRebirth.KingSwitch:Set(false) end
     if tabs.boss.Data.TrainingSnapshot.Tool then tabs.farming.ToolExerciseSwitch:Set(false) end
     if tabs.boss.Data.TrainingSnapshot.Squat then tabs.farming.SquatExerciseSwitch:Set(false) end
     if tabs.boss.Data.TrainingSnapshot.Lift then tabs.farming.LiftExerciseSwitch:Set(false) end
@@ -1411,9 +1308,8 @@ tabs.boss.resumeTraining = function(snapshot)
     snapshot = tabs.boss.Data.TrainingSnapshot
     if not snapshot then return end
     tabs.boss.Data.TrainingSnapshot = nil
-    if snapshot.Rebirth then tabs.farming.RebirthData.Switch:Set(true) end
     if snapshot.Size then tabs.farming.SizeSwitch:Set(true) end
-    if snapshot.King then tabs.farming.KingSwitch:Set(true) end
+    if snapshot.King then tabs.fullRebirth.KingSwitch:Set(true) end
     if snapshot.Tool then tabs.farming.ToolExerciseSwitch:Set(true) end
     if snapshot.Squat then tabs.farming.SquatExerciseSwitch:Set(true) end
     if snapshot.Lift then tabs.farming.LiftExerciseSwitch:Set(true) end
@@ -1664,7 +1560,7 @@ tabs.boss.AutoFarmSwitch = tabs.boss:AddSwitch("Auto Farm Boss", function(state)
 end)
 
 -- ==========================================
--- SILENCE: OTHER TAB
+-- HORARYBRECH: OTHER TAB
 -- ==========================================
 tabs.other.eggsowned = tabs.other:AddLabel("Protein Eggs: 0")
 tabs.other.eggsowned.TextSize = 14
@@ -1889,17 +1785,12 @@ tabs.other:AddButton("Anti Lag (for bad devices)", function()
     pcall(function() services.ReplicatedStorage.shared.assets.ui.durabilityFrame:Destroy() end)
 end)
 
-tabs.other:AddButton("Equip Rep Pets", function() equipBestFarmingPets() end)
-
 -- ==========================================
 -- INFO TAB
 -- ==========================================
 tabs.info:Show()
-tabs.info:AddLabel("Proyectados Hub - Farming & Boss Fusion")
-tabs.info:AddLabel("Optimizado estrictamente para Farmeo y Jefes.")
-tabs.info:AddLabel("Créditos originales:")
-tabs.info:AddLabel("- cyanam1 & White (HonenxWhite)")
-tabs.info:AddLabel("- Henrik & Muki (Silence)")
+tabs.info:AddLabel("Proyectados Hub - Farming")
+tabs.info:AddLabel("ProyectadosHub by Horarybrech")
 tabs.info.VersionLabel = tabs.info:AddLabel("Muscle Legends [Proyectados Edition]")
 tabs.info.VersionLabel.TextSize = 20
 tabs.info.VersionLabel.Font = Enum.Font.Arcade
