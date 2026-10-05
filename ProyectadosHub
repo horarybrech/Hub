@@ -321,6 +321,7 @@ local tabs = {
     farming = utils.ProyectadosHub:AddTab("Farming"),
     fullFarm = utils.ProyectadosHub:AddTab("Full Farm"),
     fullRebirth = utils.ProyectadosHub:AddTab("Full Rebirth"),
+    configs = utils.ProyectadosHub:AddTab("Configs"),
     boss = utils.ProyectadosHub:AddTab("Boss"),
     other = utils.ProyectadosHub:AddTab("Other"),
     info = utils.ProyectadosHub:AddTab("Info")
@@ -945,6 +946,77 @@ task.spawn(function()
         tabs.fullFarm.updateRuntime()
         tabs.fullFarm.calculatePace()
         task.wait(1)
+    end
+end)
+
+-- ==========================================
+-- CONFIGS TAB
+-- ==========================================
+tabs.configs:AddLabel("⚙️ Automatización Rápida:")
+
+tabs.configs:AddSwitch("Rebirth in Industrial", function(state)
+    if state then
+        -- 1. Teletransporte al Industrial Lift
+        pcall(function()
+            local char = lp.player.Character or lp.player.CharacterAdded:Wait()
+            local hrp = char:WaitForChild("HumanoidRootPart")
+            hrp.CFrame = CFrame.new(Vector3.new(-5491.68945, 81.2379913, 4643.85791))
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+            task.wait(0.4)
+            services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.1)
+            services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        end)
+        task.wait(0.5)
+        -- 2. Activar Fast Rep (en Full Farm)
+        if tabs.fullFarm and tabs.fullFarm.FastRepToggle then
+            tabs.fullFarm.FastRepToggle:Set(true)
+        end
+        -- 3. Activar Fast Rebirth V2
+        if tabs.fullRebirth and tabs.fullRebirth.FastRebirthV2Toggle then
+            tabs.fullRebirth.FastRebirthV2Toggle:Set(true)
+        end
+    else
+        if tabs.fullFarm and tabs.fullFarm.FastRepToggle then
+            tabs.fullFarm.FastRepToggle:Set(false)
+        end
+        if tabs.fullRebirth and tabs.fullRebirth.FastRebirthV2Toggle then
+            tabs.fullRebirth.FastRebirthV2Toggle:Set(false)
+        end
+    end
+end)
+
+tabs.configs:AddSwitch("Rebirth Overcharge", function(state)
+    if state then
+        -- 1. Teletransporte al Overcharged Lift
+        pcall(function()
+            local char = lp.player.Character or lp.player.CharacterAdded:Wait()
+            local hrp = char:WaitForChild("HumanoidRootPart")
+            hrp.CFrame = CFrame.new(Vector3.new(-3023.363, 151.797, 4696.859))
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+            task.wait(0.4)
+            services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.1)
+            services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        end)
+        task.wait(0.5)
+        -- 2. Activar Fast Rep (en Full Farm)
+        if tabs.fullFarm and tabs.fullFarm.FastRepToggle then
+            tabs.fullFarm.FastRepToggle:Set(true)
+        end
+        -- 3. Activar Fast Rebirth V2
+        if tabs.fullRebirth and tabs.fullRebirth.FastRebirthV2Toggle then
+            tabs.fullRebirth.FastRebirthV2Toggle:Set(true)
+        end
+    else
+        if tabs.fullFarm and tabs.fullFarm.FastRepToggle then
+            tabs.fullFarm.FastRepToggle:Set(false)
+        end
+        if tabs.fullRebirth and tabs.fullRebirth.FastRebirthV2Toggle then
+            tabs.fullRebirth.FastRebirthV2Toggle:Set(false)
+        end
     end
 end)
 
