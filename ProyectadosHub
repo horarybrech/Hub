@@ -13,7 +13,8 @@ local services = {
     RunService = game:GetService("RunService"),
     CollectionService = game:GetService("CollectionService"),
     HttpService = game:GetService("HttpService"),
-    StarterGui = game:GetService("StarterGui")
+    StarterGui = game:GetService("StarterGui"),
+    MarketplaceService = game:GetService("MarketplaceService")
 }
 
 local utils = {}
@@ -52,7 +53,9 @@ utils.remotes = {
     MuscleEvent = utils.playerData.Player:WaitForChild("muscleEvent")
 }
 
+-- ==========================================
 -- Funciones Base HonenxWhite
+-- ==========================================
 function utils.formatNumber(n)
     if n >= 1e18 then return string.format("%.1fqi", n / 1e18)
     elseif n >= 1e15 then return string.format("%.1fqa", n / 1e15)
@@ -317,6 +320,7 @@ end)
 local tabs = {
     farming = utils.ProyectadosHub:AddTab("Farming"),
     fast = utils.ProyectadosHub:AddTab("⚡ Fast"),
+    universe = utils.ProyectadosHub:AddTab("🌟 Universe Farm"),
     boss = utils.ProyectadosHub:AddTab("Boss"),
     strength = utils.ProyectadosHub:AddTab("Strength"),
     strength2 = utils.ProyectadosHub:AddTab("Strength Slower"),
@@ -328,7 +332,7 @@ for _, tab in pairs(tabs) do
     tab.runtime = {}
 end
 
-tabs.other.RedactConfig = {RedactName = true, RedactStats = true}
+tabs.other.RedactConfig = {RedactName = true, RedactStats = false}
 tabs.other.redactStats = tabs.other.RedactConfig.RedactStats
 local privacyRedactor = createPrivacyRedactor(lp.player, "Farming")
 
@@ -337,8 +341,45 @@ local function formatCurrentStat(value)
 end
 
 -- ==========================================
--- HONENXWHITE: FARMING TAB
+-- HONENXWHITE: FARMING TAB (CON AUTOLIFT Y VELOCIDAD PERSONALIZABLE)
 -- ==========================================
+tabs.farming:AddLabel("AutoLift Configuration:")
+tabs.farming.AutoLiftSpeed = 0.06
+tabs.farming:AddTextBox("Velocidad AutoLift (ej: 0.06):", function(text)
+    local num = tonumber(text)
+    if num and num > 0 then
+        tabs.farming.AutoLiftSpeed = num
+    end
+end, {clear = false})
+
+tabs.farming.AutoLiftActive = false
+tabs.farming:AddSwitch("Activar AutoLift (Con Movimiento y Animación)", function(state)
+    tabs.farming.AutoLiftActive = state
+    if state then
+        task.spawn(function()
+            while tabs.farming.AutoLiftActive and utils.isCurrent() do
+                pcall(function()
+                    local char = utils.playerData.Player.Character
+                    local hum = char and char:FindFirstChildOfClass("Humanoid")
+                    if char and hum and hum.Health > 0 then
+                        local weightTool = char:FindFirstChild("Weight") or utils.playerData.Player.Backpack:FindFirstChild("Weight")
+                        if weightTool then
+                            if weightTool.Parent ~= char then
+                                hum:EquipTool(weightTool)
+                                task.wait(0.02)
+                            end
+                            weightTool:Activate()
+                            utils.remotes.MuscleEvent:FireServer("rep")
+                        end
+                    end
+                end)
+                task.wait(tabs.farming.AutoLiftSpeed)
+            end
+        end)
+    end
+end)
+
+tabs.farming:AddLabel("")
 tabs.farming:AddLabel("Rebirths:")
 tabs.farming.RebirthData = {
     Label = tabs.farming:AddLabel("Rebirths: 0"),
@@ -826,10 +867,209 @@ tabs.fast.FastRepToggle = tabs.fast:AddSwitch("Fast Rep ⚡ (No Lag)", function(
     end
 end)
 
-tabs.fast:AddLabel("")
-tabs.fast:AddLabel("🔄 Fast Rebirth V2 (Automático):")
+-- ==========================================
+-- UNIVERSE FARM TAB (FAST REPS, REBIRTH V2 & CALCULADORA UNIFICADOS)
+-- ==========================================
+tabs.universe:AddLabel("⚡ Fast Reps (Strength):")
+tabs.universe.leaderstats = lp.player:WaitForChild("leaderstats")
+tabs.universe.strength = tabs.universe.leaderstats:WaitForChild("Strength")
+tabs.universe.durability = lp.player:WaitForChild("Durability")
+tabs.universe.running = false
+tabs.universe.workerActive = false
+tabs.universe.startedAt = 0
+tabs.universe.totalElapsed = 0
+tabs.universe.timerStarted = false
+tabs.universe.gainedBaselineSet = false
+tabs.universe.startStrength = tabs.universe.strength.Value
+tabs.universe.startDurability = tabs.universe.durability.Value
+tabs.universe.calculationInterval = 10
+tabs.universe.lastCalculationAt = tick()
+tabs.universe.lastCalculatedStrength = tabs.universe.strength.Value
+tabs.universe.lastCalculatedDurability = tabs.universe.durability.Value
+tabs.universe.initialSendRate = 200
+tabs.universe.maxSendRate = 659
+tabs.universe.sendRate = tabs.universe.initialSendRate
+tabs.universe.sendTokens = 0
+tabs.universe.maxBurst = 24
+tabs.universe.controlInterval = 0.5
+tabs.universe.lastControlAt = tick()
+tabs.universe.lastControlStrength = tabs.universe.strength.Value
+tabs.universe.lastControlDurability = tabs.universe.durability.Value
+tabs.universe.stalledIntervals = 0
+tabs.universe.lastLoopAt = os.clock()
 
-tabs.fast.FastRebirthV2Data = {
+tabs.universe.Status = tabs.universe:AddLabel("Status: Inactive")
+tabs.universe.Runtime = tabs.universe:AddLabel("Runtime: 0d 0h 0m 0s")
+tabs.universe.StrengthStats = tabs.universe:AddLabel("Strength: " .. formatCurrentStat(tabs.universe.strength.Value) .. " | Gained: 0")
+tabs.universe.DurabilityStats = tabs.universe:AddLabel("Durability: " .. formatCurrentStat(tabs.universe.durability.Value) .. " | Gained: 0")
+tabs.universe.StrengthPace = tabs.universe:AddLabel("Str Pace: --/s | --/min | --/h | --/d")
+tabs.universe.DurabilityPace = tabs.universe:AddLabel("Dura Pace: --/s | --/min | --/h | --/d")
+tabs.universe.StrengthAverage = tabs.universe:AddLabel("Str Ø: --/s | --/min | --/h | --/d")
+tabs.universe.DurabilityAverage = tabs.universe:AddLabel("Dura Ø: --/s | --/min | --/h | --/d")
+tabs.universe.Status.TextColor3 = Color3.fromRGB(255, 80, 80)
+
+tabs.universe.updateRuntime = function()
+    tabs.universe.elapsed = tabs.universe.totalElapsed
+    if tabs.universe.running and tabs.universe.timerStarted then
+        tabs.universe.elapsed = tabs.universe.elapsed + tick() - tabs.universe.startedAt
+    end
+    tabs.universe.Runtime.Text = string.format("Runtime: %dd %dh %dm %ds",
+        math.floor(tabs.universe.elapsed / 86400), math.floor((tabs.universe.elapsed % 86400) / 3600),
+        math.floor((tabs.universe.elapsed % 3600) / 60), math.floor(tabs.universe.elapsed % 60))
+end
+
+tabs.universe.updateStats = function()
+    tabs.universe.StrengthStats.Text = "Strength: " .. formatCurrentStat(tabs.universe.strength.Value) .. " | Gained: " .. formatNumberSilence(tabs.universe.strength.Value - tabs.universe.startStrength)
+    tabs.universe.DurabilityStats.Text = "Durability: " .. formatCurrentStat(tabs.universe.durability.Value) .. " | Gained: " .. formatNumberSilence(tabs.universe.durability.Value - tabs.universe.startDurability)
+end
+
+tabs.universe.calculatePace = function()
+    if not tabs.universe.running or not tabs.universe.timerStarted then return end
+    if tick() - tabs.universe.lastCalculationAt < tabs.universe.calculationInterval then return end
+    tabs.universe.calculationElapsed = tick() - tabs.universe.lastCalculationAt
+    tabs.universe.strengthDelta = tabs.universe.strength.Value - tabs.universe.lastCalculatedStrength
+    tabs.universe.durabilityDelta = tabs.universe.durability.Value - tabs.universe.lastCalculatedDurability
+    tabs.universe.strengthPacePerSecond = tabs.universe.strengthDelta / tabs.universe.calculationElapsed
+    tabs.universe.durabilityPacePerSecond = tabs.universe.durabilityDelta / tabs.universe.calculationElapsed
+    if tabs.universe.strengthDelta > 0 then tabs.universe.StrengthPace.Text = "Str Pace: " .. formatPaceSilence(tabs.universe.strengthPacePerSecond) end
+    if tabs.universe.durabilityDelta > 0 then tabs.universe.DurabilityPace.Text = "Dura Pace: " .. formatPaceSilence(tabs.universe.durabilityPacePerSecond) end
+    tabs.universe.averageElapsed = tabs.universe.totalElapsed + tick() - tabs.universe.startedAt
+    tabs.universe.averageStrengthPerSecond = (tabs.universe.strength.Value - tabs.universe.startStrength) / tabs.universe.averageElapsed
+    tabs.universe.averageDurabilityPerSecond = (tabs.universe.durability.Value - tabs.universe.startDurability) / tabs.universe.averageElapsed
+    tabs.universe.StrengthAverage.Text = "Str Ø: " .. formatPaceSilence(tabs.universe.averageStrengthPerSecond)
+    tabs.universe.DurabilityAverage.Text = "Dura Ø: " .. formatPaceSilence(tabs.universe.averageDurabilityPerSecond)
+    tabs.universe.lastCalculationAt = tick()
+    tabs.universe.lastCalculatedStrength = tabs.universe.strength.Value
+    tabs.universe.lastCalculatedDurability = tabs.universe.durability.Value
+end
+
+tabs.universe.updateAdaptiveRate = function()
+    tabs.universe.controlNow = tick()
+    tabs.universe.controlElapsed = tabs.universe.controlNow - tabs.universe.lastControlAt
+    if tabs.universe.controlElapsed < tabs.universe.controlInterval then return end
+    tabs.universe.serverProgress = tabs.universe.strength.Value > tabs.universe.lastControlStrength or tabs.universe.durability.Value > tabs.universe.lastControlDurability
+    if tabs.universe.serverProgress then
+        tabs.universe.stalledIntervals = 0
+        tabs.universe.sendRate = math.min(tabs.universe.maxSendRate, tabs.universe.sendRate * 1.12)
+        tabs.universe.Status.Text = "Status: Farming | " .. formatNumberSilence(tabs.universe.sendRate) .. " reps/s"
+        tabs.universe.Status.TextColor3 = Color3.fromRGB(80, 255, 120)
+    else
+        tabs.universe.stalledIntervals = tabs.universe.stalledIntervals + 1
+    end
+    if tabs.universe.stalledIntervals >= 2 then
+        tabs.universe.sendRate = math.max(tabs.universe.initialSendRate, tabs.universe.sendRate * 0.65)
+        tabs.universe.sendTokens = 0
+        tabs.universe.Status.Text = "Status: Slowing for server | " .. formatNumberSilence(tabs.universe.sendRate) .. " reps/s"
+        tabs.universe.Status.TextColor3 = Color3.fromRGB(255, 180, 70)
+    end
+    tabs.universe.lastControlAt = tabs.universe.controlNow
+    tabs.universe.lastControlStrength = tabs.universe.strength.Value
+    tabs.universe.lastControlDurability = tabs.universe.durability.Value
+end
+
+tabs.universe.workerLoop = function()
+    tabs.universe.lastLoopAt = os.clock()
+    while tabs.universe.running do
+        tabs.universe.loopNow = os.clock()
+        tabs.universe.loopElapsed = math.min(0.1, tabs.universe.loopNow - tabs.universe.lastLoopAt)
+        tabs.universe.lastLoopAt = tabs.universe.loopNow
+        tabs.universe.updateAdaptiveRate()
+        tabs.universe.sendTokens = math.min(tabs.universe.maxBurst, tabs.universe.sendTokens + tabs.universe.sendRate * tabs.universe.loopElapsed)
+        tabs.universe.burstLimit = math.max(1, math.min(tabs.universe.maxBurst, math.ceil(tabs.universe.sendRate * 0.05)))
+        tabs.universe.sendCount = math.min(math.floor(tabs.universe.sendTokens), tabs.universe.burstLimit)
+        tabs.universe.repIndex = 1
+        while tabs.universe.repIndex <= tabs.universe.sendCount do
+            utils.remotes.MuscleEvent:FireServer("rep")
+            tabs.universe.repIndex = tabs.universe.repIndex + 1
+        end
+        tabs.universe.sendTokens = tabs.universe.sendTokens - tabs.universe.sendCount
+        services.RunService.Heartbeat:Wait()
+    end
+    tabs.universe.workerActive = false
+end
+
+tabs.universe.startWorker = function()
+    if tabs.universe.workerActive then return end
+    tabs.universe.workerActive = true
+    task.spawn(tabs.universe.workerLoop)
+end
+
+tabs.universe.strength:GetPropertyChangedSignal("Value"):Connect(function()
+    tabs.universe.updateStats()
+    if not tabs.universe.timerStarted and tabs.universe.running then
+        tabs.universe.timerStarted = true
+        tabs.universe.startedAt = tick()
+        tabs.universe.lastCalculationAt = tick()
+        tabs.universe.lastCalculatedStrength = tabs.universe.strength.Value
+        tabs.universe.lastCalculatedDurability = tabs.universe.durability.Value
+    end
+end)
+
+tabs.universe:AddTextBox("Max reps/s: " .. tabs.universe.maxSendRate, function(inputText)
+    tabs.universe.maxSendRate = tonumber(inputText)
+    if tabs.universe.maxSendRate then
+        tabs.universe.maxSendRate = math.max(1, tabs.universe.maxSendRate)
+        tabs.universe.sendRate = math.min(tabs.universe.sendRate, tabs.universe.maxSendRate)
+    end
+end, {clear = false})
+
+tabs.universe:AddLabel("Recommended Speed: 659, more = lag")
+
+tabs.universe.FastRepToggle = tabs.universe:AddSwitch("Fast Rep", function(state)
+    tabs.universe.running = state
+    if state then
+        if not tabs.universe.gainedBaselineSet then
+            tabs.universe.startStrength = tabs.universe.strength.Value
+            tabs.universe.startDurability = tabs.universe.durability.Value
+            tabs.universe.gainedBaselineSet = true
+        end
+        tabs.universe.timerStarted = false
+        tabs.universe.startedAt = 0
+        tabs.universe.sendRate = tabs.universe.initialSendRate
+        tabs.universe.sendTokens = 0
+        tabs.universe.lastLoopAt = os.clock()
+        tabs.universe.lastControlAt = tick()
+        tabs.universe.lastControlStrength = tabs.universe.strength.Value
+        tabs.universe.lastControlDurability = tabs.universe.durability.Value
+        tabs.universe.stalledIntervals = 0
+        tabs.universe.Status.Text = "Status: Farming | 200 reps/s"
+        tabs.universe.Status.TextColor3 = Color3.fromRGB(80, 255, 120)
+        tabs.universe.startWorker()
+    else
+        if tabs.universe.timerStarted and tabs.universe.startedAt > 0 then
+            tabs.universe.totalElapsed = tabs.universe.totalElapsed + tick() - tabs.universe.startedAt
+            tabs.universe.startedAt = 0
+            tabs.universe.timerStarted = false
+        end
+        tabs.universe.sendTokens = 0
+        tabs.universe.Status.Text = tabs.universe.gainedBaselineSet and "Status: Paused" or "Status: Inactive"
+        tabs.universe.Status.TextColor3 = tabs.universe.gainedBaselineSet and Color3.fromRGB(255, 180, 70) or Color3.fromRGB(255, 80, 80)
+        tabs.universe.updateRuntime()
+    end
+end)
+tabs.universe.FastRepToggle:Set(false)
+
+task.spawn(function()
+    while true do
+        tabs.universe.updateRuntime()
+        tabs.universe.calculatePace()
+        task.wait(1)
+    end
+end)
+
+tabs.universe:AddLabel("")
+tabs.universe:AddLabel("🔄 Fast Rebirth V2 & Young0x Calculadora (Unificado):")
+
+tabs.universe.TargetRebirths = 0
+tabs.universe:AddTextBox("Meta Global de Rebirths (0 = Infinito):", function(val)
+    local num = tonumber(val)
+    if num then 
+        tabs.universe.TargetRebirths = math.floor(num)
+        tabs.universe.FastRebirthV2Data.TargetRebirths = math.floor(num)
+    end
+end, {clear = false})
+
+tabs.universe.FastRebirthV2Data = {
     Running = false,
     WorkerActive = false,
     Rebirths = utils.playerData.Player.leaderstats:WaitForChild("Rebirths"),
@@ -843,12 +1083,17 @@ tabs.fast.FastRebirthV2Data = {
     GolemPets = {"Powercore Hound", "Mighty Monster", "Wild Wizard", "Chaos Sorcerer", "Mythic Boss Pet", "Legendary Boss Pet", "Epic Boss Pet", "Rainbow Boss Pet"}
 }
 
-tabs.fast.FastRebirthV2Status = tabs.fast:AddLabel("Status: Inactive")
-tabs.fast.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 80, 80)
-tabs.fast.FastRebirthV2Stats = tabs.fast:AddLabel("Rebirths: 0 | Gained: 0")
-tabs.fast.FastRebirthV2Speed = tabs.fast:AddLabel("Speed: --/min")
+tabs.universe.FastRebirthV2Status = tabs.universe:AddLabel("Status: Inactive")
+tabs.universe.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 80, 80)
+tabs.universe.FastRebirthV2Stats = tabs.universe:AddLabel("Rebirths: 0 | Gained: 0")
+tabs.universe.FastRebirthV2Speed = tabs.universe:AddLabel("Speed: --/min")
 
-tabs.fast.equipPetsByNameV2 = function(petNames, maxPets)
+tabs.universe.MissingLabel = tabs.universe:AddLabel("Rebirths Faltantes: 0")
+tabs.universe.AvgTimeLabel = tabs.universe:AddLabel("Velocidad: Calculando...")
+tabs.universe.EtaLabel = tabs.universe:AddLabel("Tiempo Estimado: --h --m --s")
+tabs.universe.EtaLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
+
+tabs.universe.equipPetsByNameV2 = function(petNames, maxPets)
     maxPets = maxPets or 12
     local uniquePets = utils.playerData.Player.petsFolder.Unique
     local equipped = 0
@@ -876,103 +1121,161 @@ tabs.fast.equipPetsByNameV2 = function(petNames, maxPets)
     return equipped
 end
 
-tabs.fast.FastRebirthV2Worker = function()
-    local startRebirths = tabs.fast.FastRebirthV2Data.Rebirths.Value
-    tabs.fast.FastRebirthV2Data.TotalRebirths = 0
+tabs.universe.FastRebirthV2Worker = function()
+    local startRebirths = tabs.universe.FastRebirthV2Data.Rebirths.Value
+    tabs.universe.FastRebirthV2Data.TotalRebirths = 0
     local lastCheck = tick()
     local lastRebirthCount = startRebirths
     
-    while utils.isCurrent() and tabs.fast.FastRebirthV2Data.Running do
-        if tabs.fast.FastRebirthV2Data.TargetRebirths > 0 and tabs.fast.FastRebirthV2Data.Rebirths.Value >= tabs.fast.FastRebirthV2Data.TargetRebirths then
-            tabs.fast.FastRebirthV2Status.Text = "Status: ✅ Target alcanzado!"
-            tabs.fast.FastRebirthV2Status.TextColor3 = Color3.fromRGB(80, 255, 120)
-            tabs.fast.FastRebirthV2Data.Running = false
+    while utils.isCurrent() and tabs.universe.FastRebirthV2Data.Running do
+        if tabs.universe.FastRebirthV2Data.TargetRebirths > 0 and tabs.universe.FastRebirthV2Data.Rebirths.Value >= tabs.universe.FastRebirthV2Data.TargetRebirths then
+            tabs.universe.FastRebirthV2Status.Text = "Status: ✅ Target alcanzado!"
+            tabs.universe.FastRebirthV2Status.TextColor3 = Color3.fromRGB(80, 255, 120)
+            tabs.universe.FastRebirthV2Data.Running = false
             break
         end
         
-        tabs.fast.FastRebirthV2Status.Text = "Status: ⚡ Equipando velocidad..."
-        tabs.fast.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 200, 80)
-        pcall(function() tabs.fast.equipPetsByNameV2(tabs.fast.FastRebirthV2Data.RepPets, 12) end)
+        tabs.universe.FastRebirthV2Status.Text = "Status: ⚡ Equipando velocidad..."
+        tabs.universe.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 200, 80)
+        pcall(function() tabs.universe.equipPetsByNameV2(tabs.universe.FastRebirthV2Data.RepPets, 12) end)
         task.wait(0.3)
         
-        local currentRebirths = tabs.fast.FastRebirthV2Data.Rebirths.Value
+        local currentRebirths = tabs.universe.FastRebirthV2Data.Rebirths.Value
         local targetStrength = 5000 + currentRebirths * 2550
         local repsPerBurst = utils.playerData.Player.MembershipType == Enum.MembershipType.Premium and 6 or 12
         
-        tabs.fast.FastRebirthV2Status.Text = "Status: 💪 Farmeando... " .. utils.formatNumber(tabs.fast.FastRebirthV2Data.Strength.Value) .. " / " .. utils.formatNumber(targetStrength)
-        tabs.fast.FastRebirthV2Status.TextColor3 = Color3.fromRGB(80, 255, 120)
+        tabs.universe.FastRebirthV2Status.Text = "Status: 💪 Farmeando... " .. utils.formatNumber(tabs.universe.FastRebirthV2Data.Strength.Value) .. " / " .. utils.formatNumber(targetStrength)
+        tabs.universe.FastRebirthV2Status.TextColor3 = Color3.fromRGB(80, 255, 120)
         
-        while utils.isCurrent() and tabs.fast.FastRebirthV2Data.Running and tabs.fast.FastRebirthV2Data.Strength.Value < targetStrength do
+        while utils.isCurrent() and tabs.universe.FastRebirthV2Data.Running and tabs.universe.FastRebirthV2Data.Strength.Value < targetStrength do
             for i = 1, repsPerBurst do
                 pcall(function() utils.remotes.MuscleEvent:FireServer("rep") end)
             end
             task.wait(0.02)
-            tabs.fast.FastRebirthV2Stats.Text = "Rebirths: " .. utils.formatWithCommas(tabs.fast.FastRebirthV2Data.Rebirths.Value) .. " | Gained: " .. utils.formatWithCommas(tabs.fast.FastRebirthV2Data.Rebirths.Value - startRebirths)
+            tabs.universe.FastRebirthV2Stats.Text = "Rebirths: " .. utils.formatWithCommas(tabs.universe.FastRebirthV2Data.Rebirths.Value) .. " | Gained: " .. utils.formatWithCommas(tabs.universe.FastRebirthV2Data.Rebirths.Value - startRebirths)
         end
         
-        if utils.isCurrent() and tabs.fast.FastRebirthV2Data.Running and tabs.fast.FastRebirthV2Data.Strength.Value >= targetStrength then
-            if tabs.fast.FastRebirthV2Data.UsePackPets then
-                tabs.fast.FastRebirthV2Status.Text = "Status: 🎁 Equipando packs..."
-                tabs.fast.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 150, 255)
-                pcall(function() tabs.fast.equipPetsByNameV2(tabs.fast.FastRebirthV2Data.PackPets, 12) end)
+        if utils.isCurrent() and tabs.universe.FastRebirthV2Data.Running and tabs.universe.FastRebirthV2Data.Strength.Value >= targetStrength then
+            if tabs.universe.FastRebirthV2Data.UsePackPets then
+                tabs.universe.FastRebirthV2Status.Text = "Status: 🎁 Equipando packs..."
+                tabs.universe.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 150, 255)
+                pcall(function() tabs.universe.equipPetsByNameV2(tabs.universe.FastRebirthV2Data.PackPets, 12) end)
                 task.wait(0.5)
             end
             
-            tabs.fast.FastRebirthV2Status.Text = "Status: 🔄 Haciendo rebirth..."
-            tabs.fast.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 200, 80)
+            tabs.universe.FastRebirthV2Status.Text = "Status: 🔄 Haciendo rebirth..."
+            tabs.universe.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 200, 80)
             
-            local rebirthValueBefore = tabs.fast.FastRebirthV2Data.Rebirths.Value
+            local rebirthValueBefore = tabs.universe.FastRebirthV2Data.Rebirths.Value
             local attempts = 0
             
             repeat
                 pcall(function() services.ReplicatedStorage.rEvents.rebirthRemote:InvokeServer("rebirthRequest") end)
                 task.wait(0.05)
                 attempts = attempts + 1
-            until not tabs.fast.FastRebirthV2Data.Running or tabs.fast.FastRebirthV2Data.Rebirths.Value > rebirthValueBefore or attempts >= 50
+            until not tabs.universe.FastRebirthV2Data.Running or tabs.universe.FastRebirthV2Data.Rebirths.Value > rebirthValueBefore or attempts >= 50
             
-            if tabs.fast.FastRebirthV2Data.Rebirths.Value > rebirthValueBefore then
-                tabs.fast.FastRebirthV2Data.TotalRebirths = tabs.fast.FastRebirthV2Data.TotalRebirths + (tabs.fast.FastRebirthV2Data.Rebirths.Value - rebirthValueBefore)
+            if tabs.universe.FastRebirthV2Data.Rebirths.Value > rebirthValueBefore then
+                tabs.universe.FastRebirthV2Data.TotalRebirths = tabs.universe.FastRebirthV2Data.TotalRebirths + (tabs.universe.FastRebirthV2Data.Rebirths.Value - rebirthValueBefore)
             end
             
-            if tabs.fast.FastRebirthV2Data.UseGolems then
-                tabs.fast.FastRebirthV2Status.Text = "Status: 🐾 Re-equipando golems..."
-                tabs.fast.FastRebirthV2Status.TextColor3 = Color3.fromRGB(150, 200, 255)
+            if tabs.universe.FastRebirthV2Data.UseGolems then
+                tabs.universe.FastRebirthV2Status.Text = "Status: 🐾 Re-equipando golems..."
+                tabs.universe.FastRebirthV2Status.TextColor3 = Color3.fromRGB(150, 200, 255)
                 task.wait(0.5)
-                pcall(function() tabs.fast.equipPetsByNameV2(tabs.fast.FastRebirthV2Data.GolemPets, 12) end)
+                pcall(function() tabs.universe.equipPetsByNameV2(tabs.universe.FastRebirthV2Data.GolemPets, 12) end)
             end
         end
         
         if tick() - lastCheck >= 1 then
-            local currentCount = tabs.fast.FastRebirthV2Data.Rebirths.Value
+            local currentCount = tabs.universe.FastRebirthV2Data.Rebirths.Value
             local gained = currentCount - lastRebirthCount
-            tabs.fast.FastRebirthV2Speed.Text = "Speed: " .. gained .. " rebirths/s"
+            tabs.universe.FastRebirthV2Speed.Text = "Speed: " .. gained .. " rebirths/s"
             lastRebirthCount = currentCount
             lastCheck = tick()
         end
         task.wait(0.3)
     end
-    tabs.fast.FastRebirthV2Data.WorkerActive = false
+    tabs.universe.FastRebirthV2Data.WorkerActive = false
 end
 
-tabs.fast:AddTextBox("V2 - Target rebirths (0 = infinito):", function(text)
-    local num = tonumber(text)
-    if num and num >= 0 then tabs.fast.FastRebirthV2Data.TargetRebirths = math.floor(num) end
-end, {clear = false})
-
-tabs.fast:AddSwitch("V2 - Usar Golems después del rebirth", function(state) tabs.fast.FastRebirthV2Data.UseGolems = state end):Set(true)
-tabs.fast:AddSwitch("V2 - Usar Packs (x2 Rebirths)", function(state) tabs.fast.FastRebirthV2Data.UsePackPets = state end):Set(true)
-tabs.fast.FastRebirthV2Toggle = tabs.fast:AddSwitch("Fast Rebirth V2 🔄 (Auto)", function(state)
-    tabs.fast.FastRebirthV2Data.Running = state
+tabs.universe:AddSwitch("V2 - Usar Golems después del rebirth", function(state) tabs.universe.FastRebirthV2Data.UseGolems = state end):Set(true)
+tabs.universe:AddSwitch("V2 - Usar Packs (x2 Rebirths)", function(state) tabs.universe.FastRebirthV2Data.UsePackPets = state end):Set(true)
+tabs.universe.FastRebirthV2Toggle = tabs.universe:AddSwitch("Fast Rebirth V2 🔄 (Auto Unificado)", function(state)
+    tabs.universe.FastRebirthV2Data.Running = state
+    tabs.universe.FastRebirthV2Data.TargetRebirths = tabs.universe.TargetRebirths
     if state then
-        tabs.fast.FastRebirthV2Status.Text = "Status: 🔄 Iniciando V2..."
-        tabs.fast.FastRebirthV2Status.TextColor3 = Color3.fromRGB(80, 255, 120)
-        if not tabs.fast.FastRebirthV2Data.WorkerActive then
-            tabs.fast.FastRebirthV2Data.WorkerActive = true
-            task.spawn(tabs.fast.FastRebirthV2Worker)
+        tabs.universe.FastRebirthV2Status.Text = "Status: 🔄 Iniciando V2..."
+        tabs.universe.FastRebirthV2Status.TextColor3 = Color3.fromRGB(80, 255, 120)
+        if not tabs.universe.FastRebirthV2Data.WorkerActive then
+            tabs.universe.FastRebirthV2Data.WorkerActive = true
+            task.spawn(tabs.universe.FastRebirthV2Worker)
         end
     else
-        tabs.fast.FastRebirthV2Status.Text = "Status: Inactive"
-        tabs.fast.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 80, 80)
+        tabs.universe.FastRebirthV2Status.Text = "Status: Inactive"
+        tabs.universe.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 80, 80)
+    end
+end)
+
+task.spawn(function()
+    local leaderstats = utils.playerData.Player:WaitForChild("leaderstats")
+    local rebirthsStat = leaderstats:WaitForChild("Rebirths")
+    
+    local lastRebirthCount = rebirthsStat.Value
+    local lastRebirthTime = tick()
+    local timeRecords = {} 
+    local maxRecords = 5
+    
+    while utils.isCurrent() do
+        local currentRebirths = rebirthsStat.Value
+        
+        if currentRebirths > lastRebirthCount then
+            local timeTaken = tick() - lastRebirthTime
+            table.insert(timeRecords, timeTaken)
+            if #timeRecords > maxRecords then
+                table.remove(timeRecords, 1)
+            end
+            lastRebirthCount = currentRebirths
+            lastRebirthTime = tick()
+        end
+        
+        if currentRebirths < lastRebirthCount then
+            lastRebirthCount = currentRebirths
+            timeRecords = {}
+        end
+        
+        local missing = math.max(0, tabs.universe.TargetRebirths - currentRebirths)
+        tabs.universe.MissingLabel.Text = "Rebirths Faltantes: " .. utils.formatWithCommas(missing)
+        
+        if tabs.universe.TargetRebirths <= 0 then
+            tabs.universe.AvgTimeLabel.Text = "Velocidad: Ingresa una meta arriba"
+            tabs.universe.EtaLabel.Text = "Tiempo Estimado: N/A"
+            tabs.universe.EtaLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        elseif missing == 0 and tabs.universe.TargetRebirths > 0 then
+            tabs.universe.AvgTimeLabel.Text = "Velocidad: Meta alcanzada"
+            tabs.universe.EtaLabel.Text = "Tiempo Estimado: Completado!"
+            tabs.universe.EtaLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
+        elseif #timeRecords > 0 then
+            local sum = 0
+            for _, t in ipairs(timeRecords) do sum = sum + t end
+            local avgTime = sum / #timeRecords
+            
+            tabs.universe.AvgTimeLabel.Text = string.format("Velocidad: 1 Rebirth cada %.1f seg", avgTime)
+            
+            local totalSecondsRemaining = missing * avgTime
+            local hours = math.floor(totalSecondsRemaining / 3600)
+            local minutes = math.floor((totalSecondsRemaining % 3600) / 60)
+            local seconds = math.floor(totalSecondsRemaining % 60)
+            
+            tabs.universe.EtaLabel.Text = string.format("Tiempo Estimado: %dh %dm %ds", hours, minutes, seconds)
+            tabs.universe.EtaLabel.TextColor3 = Color3.fromRGB(80, 200, 255)
+        else
+            tabs.universe.AvgTimeLabel.Text = "Velocidad: Esperando tu primer Rebirth..."
+            tabs.universe.EtaLabel.Text = "Tiempo Estimado: Calculando..."
+            tabs.universe.EtaLabel.TextColor3 = Color3.fromRGB(255, 200, 80)
+        end
+        
+        task.wait(1)
     end
 end)
 
@@ -1396,7 +1699,7 @@ tabs.boss.AutoFarmSwitch = tabs.boss:AddSwitch("Auto Farm Boss", function(state)
 end)
 
 -- ==========================================
--- SILENCE: STRENGTH TAB
+-- SILENCE: STRENGTH TAB (Slower/Backup)
 -- ==========================================
 tabs.strength.leaderstats = lp.player:WaitForChild("leaderstats")
 tabs.strength.strength = tabs.strength.leaderstats:WaitForChild("Strength")
@@ -1409,9 +1712,6 @@ tabs.strength.timerStarted = false
 tabs.strength.gainedBaselineSet = false
 tabs.strength.startStrength = tabs.strength.strength.Value
 tabs.strength.startDurability = tabs.strength.durability.Value
-tabs.strength.lastSampleAt = tick()
-tabs.strength.lastStrength = tabs.strength.strength.Value
-tabs.strength.lastDurability = tabs.strength.durability.Value
 tabs.strength.calculationInterval = 10
 tabs.strength.lastCalculationAt = tick()
 tabs.strength.lastCalculatedStrength = tabs.strength.strength.Value
@@ -1767,7 +2067,7 @@ tabs.other.autoShake = false
 tabs.other.autoSpinWheel = false
 tabs.other.hidePopups = true
 tabs.other.popupSwitchInitializing = true
-tabs.other.hidePets = false
+tabs.other.hidePets = true
 tabs.other.savePlayerSizeEvent = services.ReplicatedStorage.rEvents:WaitForChild("savePlayerSizeEvent")
 tabs.other.showPetsEvent = services.ReplicatedStorage.rEvents:WaitForChild("showPetsEvent")
 
@@ -1896,10 +2196,12 @@ end)
 
 tabs.other:AddSwitch("Eat All Boosts (Expect Lag)", function(state) tabs.other.eatAllBoostsRunning = state end):Set(false)
 
-tabs.other:AddSwitch("Hide Pets", function(state)
+tabs.other.HidePetsSwitch = tabs.other:AddSwitch("Hide Pets", function(state)
     tabs.other.hidePets = state
     tabs.other.showPetsEvent:FireServer(state and "hidePets" or "showPets")
-end):Set(true)
+end)
+tabs.other.HidePetsSwitch:Set(true)
+tabs.other.showPetsEvent:FireServer("hidePets")
 
 tabs.other.HidePopupsSwitch = tabs.other:AddSwitch("Hide Popups", function(state)
     tabs.other.hidePopups = state
@@ -1913,14 +2215,18 @@ tabs.other.popupSwitchInitializing = false
 tabs.other.RedactNameSwitch = tabs.other:AddSwitch("Redact Name", function(state)
     privacyRedactor:SetNameEnabled(state)
 end)
+tabs.other.RedactNameSwitch:Set(true)
+privacyRedactor:SetNameEnabled(true)
 
 tabs.other.RedactStatsSwitch = tabs.other:AddSwitch("Redact Stats", function(state)
     tabs.other.redactStats = state
     privacyRedactor:SetStatsEnabled(state)
     tabs.strength.updateStats()
     tabs.strength2.updateStats()
+    tabs.universe.updateStats()
 end)
-tabs.other.RedactStatsSwitch:Set(tabs.other.RedactConfig.RedactStats)
+tabs.other.RedactStatsSwitch:Set(false)
+privacyRedactor:SetStatsEnabled(false)
 
 tabs.other.tpE = function(position)
     tabs.other.character = lp.player.Character or lp.player.CharacterAdded:Wait()
