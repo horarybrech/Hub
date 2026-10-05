@@ -1,5 +1,5 @@
 --[[
-    Proyectados Hub - Farming, Rebirth & Boss (Versión Horarybrech)
+    Proyectados Hub - Farming, Rebirth & Boss (Versión Completa con AutoLift Dinámico y AFK - Horarybrech)
 ]]
 
 local services = {
@@ -20,20 +20,20 @@ local services = {
 local utils = {}
 utils.runtime = {}
 
-for _, connection in ipairs(_G.ProyectadosHubMainConnections or {}) do
+for _, connection in ipairs(_G.HorarybrechMainConnections or {}) do
     pcall(function() connection:Disconnect() end)
 end
-_G.ProyectadosHubMainConnections = {}
-_G.ProyectadosHubMainGeneration = (_G.ProyectadosHubMainGeneration or 0) + 1
-utils.Generation = _G.ProyectadosHubMainGeneration
+_G.HorarybrechMainConnections = {}
+_G.HorarybrechMainGeneration = (_G.HorarybrechMainGeneration or 0) + 1
+utils.Generation = _G.HorarybrechMainGeneration
 
 function utils.isCurrent()
-    return utils.Generation == _G.ProyectadosHubMainGeneration
+    return utils.Generation == _G.HorarybrechMainGeneration
 end
 
 function utils.connect(signal, callback, connection)
     connection = signal:Connect(callback)
-    table.insert(_G.ProyectadosHubMainConnections, connection)
+    table.insert(_G.HorarybrechMainConnections, connection)
     return connection
 end
 
@@ -93,9 +93,7 @@ function utils.deleteAds()
             portal:Destroy()
         end
     end
-    if _G.ads then
-        _G.ads:Disconnect()
-    end
+    if _G.ads then _G.ads:Disconnect() end
     _G.ads = game.DescendantAdded:Connect(function(descendant)
         if descendant.Name == "RobloxForwardPortals" then
             descendant:Destroy()
@@ -143,9 +141,9 @@ local function createPrivacyRedactor(player, key)
         OriginalStats = setmetatable({}, {__mode = "k"}),
         NameGuis = setmetatable({}, {__mode = "k"}),
     }
-    _G.ProyectadosHubPrivacyGenerations = _G.ProyectadosHubPrivacyGenerations or {}
-    _G.ProyectadosHubPrivacyGenerations[key] = (_G.ProyectadosHubPrivacyGenerations[key] or 0) + 1
-    local generation = _G.ProyectadosHubPrivacyGenerations[key]
+    _G.HorarybrechPrivacyGenerations = _G.HorarybrechPrivacyGenerations or {}
+    _G.HorarybrechPrivacyGenerations[key] = (_G.HorarybrechPrivacyGenerations[key] or 0) + 1
+    local generation = _G.HorarybrechPrivacyGenerations[key]
 
     local function containsName(text)
         return string.find(text, player.Name, 1, true)
@@ -169,81 +167,29 @@ local function createPrivacyRedactor(player, key)
         end
         table.clear(storage)
         task.spawn(function()
-            for _ = 1, 5 do
+            for _ = 1, 3 do
                 if not stillDisabled() then return end
                 for _, saved in ipairs(savedObjects) do
                     if saved.Object.Parent then saved.Object.Text = saved.Text end
                 end
-                task.wait(0.1)
+                task.wait(0.2)
             end
         end)
-    end
-
-    local function setNameGuiHidden(nameGui)
-        if nameGui and nameGui:IsA("BillboardGui") then
-            if redactor.NameGuis[nameGui] == nil then redactor.NameGuis[nameGui] = nameGui.Enabled end
-            nameGui.Enabled = false
-        end
-    end
-
-    local function showNameGui(nameGui)
-        if not nameGui or not nameGui:IsA("BillboardGui") then return end
-        nameGui.Enabled = true
-    end
-
-    local function isTopStat(object)
-        if not string.find(object.Text, "%d") or object.AbsolutePosition.Y > 150 then return false end
-        local current = object
-        for _ = 1, 6 do
-            if not current then break end
-            local name = string.lower(current.Name)
-            if string.find(name, "strength", 1, true) or string.find(name, "gem", 1, true) then return true end
-            current = current.Parent
-        end
-        return false
-    end
-
-    local function redactLeaderboardStats(nameObject, coreGui)
-        local nameCenterY = nameObject.AbsolutePosition.Y + nameObject.AbsoluteSize.Y / 2
-        local minimumX = nameObject.AbsolutePosition.X + nameObject.AbsoluteSize.X * 0.5
-        local tolerance = math.max(6, nameObject.AbsoluteSize.Y * 0.5)
-        for _, valueObject in ipairs(coreGui:GetDescendants()) do
-            if (valueObject:IsA("TextLabel") or valueObject:IsA("TextButton"))
-                and valueObject ~= nameObject and string.find(valueObject.Text, "%d") then
-                local valueCenterY = valueObject.AbsolutePosition.Y + valueObject.AbsoluteSize.Y / 2
-                if valueObject.AbsolutePosition.X >= minimumX
-                    and math.abs(valueCenterY - nameCenterY) <= tolerance then
-                    redact(redactor.OriginalStats, valueObject, "####")
-                end
-            end
-        end
     end
 
     local function update()
         local character = player.Character
         if redactor.NameEnabled and character then
-            setNameGuiHidden(character:FindFirstChild("nameGui", true))
-        end
-        if redactor.NameEnabled then
-            local namedCharacter = workspace:FindFirstChild("HenneZocktTV")
-            local head = namedCharacter and namedCharacter:FindFirstChild("Head")
-            setNameGuiHidden(head and head:FindFirstChild("nameGui"))
+            local nameGui = character:FindFirstChild("nameGui", true)
+            if nameGui and nameGui:IsA("BillboardGui") then nameGui.Enabled = false end
         end
         if redactor.StatsEnabled then
-            for _, object in ipairs(player:WaitForChild("PlayerGui"):GetDescendants()) do
-                if (object:IsA("TextLabel") or object:IsA("TextButton")) and isTopStat(object) then
-                    redact(redactor.OriginalStats, object, "####")
-                end
-            end
-        end
-
-        local coreGui = game:GetService("CoreGui")
-        for _, object in ipairs(coreGui:GetDescendants()) do
-            if object:IsA("TextLabel") or object:IsA("TextButton") then
-                local saved = redactor.OriginalNames[object]
-                if containsName(object.Text) or (saved and containsName(saved.Original)) then
-                    if redactor.StatsEnabled then redactLeaderboardStats(object, coreGui) end
-                    if redactor.NameEnabled then redact(redactor.OriginalNames, object, "########") end
+            local coreGui = game:GetService("CoreGui")
+            for _, object in ipairs(coreGui:GetDescendants()) do
+                if object:IsA("TextLabel") or object:IsA("TextButton") then
+                    if containsName(object.Text) then
+                        redact(redactor.OriginalNames, object, "########")
+                    end
                 end
             end
         end
@@ -251,28 +197,7 @@ local function createPrivacyRedactor(player, key)
 
     function redactor:SetNameEnabled(enabled)
         self.NameEnabled = enabled
-        if not enabled then
-            restore(self.OriginalNames, function() return not self.NameEnabled end)
-            local savedNameGuis = {}
-            for nameGui in pairs(self.NameGuis) do table.insert(savedNameGuis, nameGui) end
-            table.clear(self.NameGuis)
-            task.spawn(function()
-                for _ = 1, 10 do
-                    if self.NameEnabled then return end
-                    local currentCharacter = player.Character
-                    local currentNameGui = currentCharacter and currentCharacter:FindFirstChild("nameGui", true)
-                    showNameGui(currentNameGui)
-                    local namedCharacter = workspace:FindFirstChild("HenneZocktTV")
-                    local head = namedCharacter and namedCharacter:FindFirstChild("Head")
-                    local explicitNameGui = head and head:FindFirstChild("nameGui")
-                    showNameGui(explicitNameGui)
-                    for _, nameGui in ipairs(savedNameGuis) do
-                        if nameGui.Parent then showNameGui(nameGui) end
-                    end
-                    task.wait(0.1)
-                end
-            end)
-        end
+        if not enabled then restore(self.OriginalNames, function() return not self.NameEnabled end) end
         pcall(update)
     end
 
@@ -283,15 +208,17 @@ local function createPrivacyRedactor(player, key)
     end
 
     task.spawn(function()
-        while _G.ProyectadosHubPrivacyGenerations[key] == generation do
+        while _G.HorarybrechPrivacyGenerations[key] == generation do
             if redactor.NameEnabled or redactor.StatsEnabled then pcall(update) end
-            task.wait(1)
+            task.wait(4)
         end
     end)
     return redactor
 end
 
--- Inicialización de Interfaz (Color Morado / Purple)
+-- ==========================================
+-- Inicialización de Interfaz (Elerium v2)
+-- ==========================================
 utils.library = loadstring(game:HttpGet("https://raw.githubusercontent.com/rodriguezberiticajuliocesar-wq/SilenceScripts/refs/heads/main/libraries/eleriumv2.luau?cache=" .. tostring(os.time()), true))()
 utils.ProyectadosHub = utils.library:AddWindow("Proyectados Hub | Farming & Boss - " .. utils.greeting(), {
     main_color = Color3.fromRGB(138, 43, 226),
@@ -342,19 +269,25 @@ local function formatCurrentStat(value)
 end
 
 -- ==========================================
--- HORARYBRECH: FARMING TAB (ESTABLE)
+-- HORARYBRECH: FARMING TAB (CON AUTOLIFT DINÁMICO)
 -- ==========================================
 tabs.farming:AddLabel("AutoLift Configuration:")
 tabs.farming.AutoLiftSpeed = 0.06
 tabs.farming:AddTextBox("Velocidad AutoLift (ej: 0.06):", function(text)
     local num = tonumber(text)
-    if num and num > 0 then
-        tabs.farming.AutoLiftSpeed = num
-    end
+    if num and num > 0 then tabs.farming.AutoLiftSpeed = num end
 end, {clear = false})
 
+tabs.farming.ExerciseData = { SelectedTool = "Weight", AutoFarm = false }
+tabs.farming.ToolDropdown = tabs.farming:AddDropdown("Select Exercise", function(selection)
+    tabs.farming.ExerciseData.SelectedTool = selection
+end)
+for _, tool in ipairs({"Weight", "Pushups", "Situps", "Handstands"}) do
+    tabs.farming.ToolDropdown:Add(tool)
+end
+
 tabs.farming.AutoLiftActive = false
-tabs.farming.AutoLiftSwitch = tabs.farming:AddSwitch("Activar AutoLift (Con Movimiento y Animación)", function(state)
+tabs.farming:AddSwitch("Activar AutoLift (Usa el ejercicio seleccionado)", function(state)
     tabs.farming.AutoLiftActive = state
     if state then
         task.spawn(function()
@@ -363,13 +296,14 @@ tabs.farming.AutoLiftSwitch = tabs.farming:AddSwitch("Activar AutoLift (Con Movi
                     local char = utils.playerData.Player.Character
                     local hum = char and char:FindFirstChildOfClass("Humanoid")
                     if char and hum and hum.Health > 0 then
-                        local weightTool = char:FindFirstChild("Weight") or utils.playerData.Player.Backpack:FindFirstChild("Weight")
-                        if weightTool then
-                            if weightTool.Parent ~= char then
-                                hum:EquipTool(weightTool)
+                        local toolName = tabs.farming.ExerciseData.SelectedTool or "Weight"
+                        local exerciseTool = char:FindFirstChild(toolName) or utils.playerData.Player.Backpack:FindFirstChild(toolName)
+                        if exerciseTool then
+                            if exerciseTool.Parent ~= char then
+                                hum:EquipTool(exerciseTool)
                                 task.wait(0.02)
                             end
-                            weightTool:Activate()
+                            exerciseTool:Activate()
                             utils.remotes.MuscleEvent:FireServer("rep")
                         end
                     end
@@ -381,26 +315,16 @@ tabs.farming.AutoLiftSwitch = tabs.farming:AddSwitch("Activar AutoLift (Con Movi
 end)
 
 tabs.farming.SizeData = {Active = false}
-tabs.farming.SizeSwitch = tabs.farming:AddSwitch("Auto Size 1", function(bool) tabs.farming.SizeData.Active = bool end)
-tabs.farming.SizeSwitch:Set(false)
+tabs.farming:AddSwitch("Auto Size 1", function(bool) tabs.farming.SizeData.Active = bool end):Set(false)
 
 task.spawn(function()
-    while utils.isCurrent() and true do
+    while utils.isCurrent() do
         if tabs.farming.SizeData.Active and utils.playerData.Character and utils.playerData.Humanoid then
-            utils.remotes.ChangeSpeedSize:InvokeServer("changeSize", 1)
+            pcall(function() utils.remotes.ChangeSpeedSize:InvokeServer("changeSize", 1) end)
         end
-        task.wait(0.01)
+        task.wait(1)
     end
 end)
-
-tabs.farming:AddLabel("Auto Exercises (recommended for rebirthing):")
-tabs.farming.ExerciseData = { SelectedTool = nil, AutoFarm = false }
-tabs.farming.ToolDropdown = tabs.farming:AddDropdown("Select Exercise", function(selection)
-    tabs.farming.ExerciseData.SelectedTool = selection
-end)
-for _, tool in ipairs({"Weight", "Pushups", "Situps", "Handstands"}) do
-    tabs.farming.ToolDropdown:Add(tool)
-end
 
 tabs.farming.MachinesFolder = services.Workspace:WaitForChild("machinesFolder")
 tabs.farming.SquatsByName = {}
@@ -429,190 +353,32 @@ end
 table.sort(tabs.farming.SquatMachineNames)
 table.sort(tabs.farming.LiftMachineNames)
 
-tabs.farming.getMachineInteractPart = function(machine)
-    for _, descendant in ipairs(machine:GetDescendants()) do
-        if descendant:IsA("BasePart") and string.lower(descendant.Name) == "interactseat" then
-            return descendant
-        end
-    end
-end
-
-tabs.farming.enterExerciseMachine = function(machine)
-    if not machine or not machine.Parent then return false end
-    tabs.farming.runtime.character_1850 = utils.playerData.Player.Character or utils.playerData.Player.CharacterAdded:Wait()
-    tabs.farming.runtime.humanoidRootPart = tabs.farming.runtime.character_1850:WaitForChild("HumanoidRootPart", 5)
-    tabs.farming.runtime.interactPart = tabs.farming.getMachineInteractPart(machine)
-    if not tabs.farming.runtime.humanoidRootPart or not tabs.farming.runtime.interactPart then return false end
-
-    tabs.farming.runtime.humanoidRootPart.CFrame = tabs.farming.runtime.interactPart.CFrame * CFrame.new(0, 3, 0)
-    tabs.farming.runtime.humanoidRootPart.AssemblyLinearVelocity = Vector3.zero
-    tabs.farming.runtime.humanoidRootPart.AssemblyAngularVelocity = Vector3.zero
-    task.wait(0.4)
-    services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-    task.wait(0.1)
-    services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-    task.wait(0.4)
-    return true
-end
-
-tabs.farming.ToolExerciseSwitch = tabs.farming:AddSwitch("Start exercising", function(enabled)
+tabs.farming:AddSwitch("Start exercising", function(enabled)
     tabs.farming.ExerciseData.AutoFarm = enabled
     if enabled then
-        if tabs.farming.SquatExerciseSwitch and tabs.farming.MachineExerciseData.Squat.Running then tabs.farming.SquatExerciseSwitch:Set(false) end
-        if tabs.farming.LiftExerciseSwitch and tabs.farming.MachineExerciseData.Lift.Running then tabs.farming.LiftExerciseSwitch:Set(false) end
         task.spawn(function()
             while utils.isCurrent() and tabs.farming.ExerciseData.AutoFarm do
-                if utils.playerData.Character ~= utils.playerData.Player.Character then
-                    utils.playerData.Character = utils.playerData.Player.Character
-                    utils.playerData.Humanoid = utils.playerData.Character and utils.playerData.Character:FindFirstChildOfClass("Humanoid")
-                end
-                if not utils.playerData.Character or not utils.playerData.Character:FindFirstChildOfClass("Humanoid") then
-                    utils.playerData.Player.CharacterAdded:Wait()
-                    utils.playerData.Character = utils.playerData.Player.Character
-                    utils.playerData.Humanoid = utils.playerData.Character and utils.playerData.Character:FindFirstChildOfClass("Humanoid")
-                    task.wait(2)
-                end
-                if not utils.playerData.Humanoid or utils.playerData.Humanoid.Health <= 0 then
-                    repeat
-                        task.wait(0.5)
-                        utils.playerData.Character = utils.playerData.Player.Character
-                        utils.playerData.Humanoid = utils.playerData.Character and utils.playerData.Character:FindFirstChildOfClass("Humanoid")
-                    until utils.playerData.Character and utils.playerData.Humanoid and utils.playerData.Humanoid.Health > 0
-                    task.wait(1)
-                end
-                if utils.playerData.Character and tabs.farming.ExerciseData.SelectedTool then
-                    tabs.farming.runtime.toolName = tabs.farming.ExerciseData.SelectedTool
-                    if not utils.playerData.Character:FindFirstChild(tabs.farming.runtime.toolName) then
-                        tabs.farming.runtime.toolInBackpack = utils.playerData.Player.Backpack:FindFirstChild(tabs.farming.runtime.toolName)
-                        if tabs.farming.runtime.toolInBackpack then
-                            utils.playerData.Humanoid:EquipTool(tabs.farming.runtime.toolInBackpack)
-                            task.wait(0.2)
+                pcall(function()
+                    local char = utils.playerData.Player.Character
+                    local hum = char and char:FindFirstChildOfClass("Humanoid")
+                    if char and hum and hum.Health > 0 and tabs.farming.ExerciseData.SelectedTool then
+                        local toolName = tabs.farming.ExerciseData.SelectedTool
+                        if not char:FindFirstChild(toolName) then
+                            local toolInBackpack = utils.playerData.Player.Backpack:FindFirstChild(toolName)
+                            if toolInBackpack then hum:EquipTool(toolInBackpack) task.wait(0.2) end
+                        end
+                        if char:FindFirstChild(toolName) then
+                            utils.playerData.Player.muscleEvent:FireServer("rep")
                         end
                     end
-                    if utils.playerData.Character:FindFirstChild(tabs.farming.runtime.toolName) then
-                        pcall(function() utils.playerData.Player.muscleEvent:FireServer("rep") end)
-                    end
-                    if tabs.farming.runtime.toolName == "Handstands" and tick() % 6 < 0.1 then
-                        pcall(function()
-                            services.VirtualUser:CaptureController()
-                            services.VirtualUser:ClickButton1(Vector2.new(500, 500))
-                        end)
-                    end
-                end
+                end)
                 task.wait()
             end
         end)
-    else
-        if tabs.farming.ExerciseData.SelectedTool and utils.playerData.Player.Character then
-            tabs.farming.runtime.equippedTool = utils.playerData.Player.Character:FindFirstChild(tabs.farming.ExerciseData.SelectedTool)
-            if tabs.farming.runtime.equippedTool then
-                tabs.farming.runtime.equippedTool.Parent = utils.playerData.Player.Backpack
-            end
-        end
     end
 end)
 
-tabs.farming.addMachineDropdown = function(label, machineData, machineNames)
-    tabs.farming.runtime.dropdown = tabs.farming:AddDropdown(label, function(selection)
-        machineData.SelectedMachine = machineData.Choices[selection]
-        machineData.ActiveMachine = nil
-        machineData.SeatPart = nil
-        machineData.ReenterAt = 0
-    end)
-    for _, machineName in ipairs(machineNames) do
-        tabs.farming.runtime.dropdown:Add(machineName)
-    end
-end
-
-tabs.farming.startMachineExercise = function(machineData)
-    machineData.Generation += 1
-    tabs.farming.runtime.generation = machineData.Generation
-    tabs.farming.runtime.lastCharacter = utils.playerData.Player.Character
-    task.spawn(function()
-        while utils.isCurrent() and machineData.Running and machineData.Generation == tabs.farming.runtime.generation do
-            tabs.farming.runtime.character_1958 = utils.playerData.Player.Character
-            tabs.farming.runtime.humanoid = tabs.farming.runtime.character_1958 and tabs.farming.runtime.character_1958:FindFirstChildOfClass("Humanoid")
-            if tabs.farming.runtime.character_1958 ~= tabs.farming.runtime.lastCharacter then
-                tabs.farming.runtime.lastCharacter = tabs.farming.runtime.character_1958
-                machineData.ActiveMachine = nil
-                machineData.SeatPart = nil
-                machineData.ReenterAt = os.clock() + 3.5
-            end
-            if not tabs.farming.runtime.character_1958 or not tabs.farming.runtime.humanoid or tabs.farming.runtime.humanoid.Health <= 0 then
-                machineData.ActiveMachine = nil
-                machineData.SeatPart = nil
-                machineData.ReenterAt = math.max(machineData.ReenterAt, os.clock() + 3.5)
-                task.wait(0.1)
-                continue
-            end
-            tabs.farming.runtime.humanoidState = tabs.farming.runtime.humanoid:GetState()
-            tabs.farming.runtime.jumpedOff = machineData.ActiveMachine and (
-                tabs.farming.runtime.humanoidState == Enum.HumanoidStateType.Jumping
-                or tabs.farming.runtime.humanoidState == Enum.HumanoidStateType.Freefall
-                or (machineData.SeatPart and tabs.farming.runtime.humanoid.SeatPart ~= machineData.SeatPart)
-            )
-            if tabs.farming.runtime.jumpedOff then
-                machineData.ActiveMachine = nil
-                machineData.SeatPart = nil
-                machineData.ReenterAt = os.clock() + 3.5
-            end
-            if machineData.SelectedMachine and not machineData.ActiveMachine and os.clock() >= machineData.ReenterAt then
-                if tabs.farming.enterExerciseMachine(machineData.SelectedMachine) then
-                    machineData.ActiveMachine = machineData.SelectedMachine
-                    machineData.SeatPart = tabs.farming.runtime.humanoid.SeatPart
-                end
-            end
-            task.wait(0.1)
-        end
-    end)
-end
-
-tabs.farming.setMachineExerciseState = function(machineData, otherMachineData, state)
-    machineData.Running = state
-    machineData.Generation += 1
-    machineData.ActiveMachine = nil
-    machineData.SeatPart = nil
-    machineData.ReenterAt = 0
-    if not state then return end
-    if tabs.farming.ToolExerciseSwitch and tabs.farming.ExerciseData.AutoFarm then tabs.farming.ToolExerciseSwitch:Set(false) end
-    if otherMachineData.Running then
-        if machineData == tabs.farming.MachineExerciseData.Squat and tabs.farming.LiftExerciseSwitch then
-            tabs.farming.LiftExerciseSwitch:Set(false)
-        elseif machineData == tabs.farming.MachineExerciseData.Lift and tabs.farming.SquatExerciseSwitch then
-            tabs.farming.SquatExerciseSwitch:Set(false)
-        end
-    end
-    tabs.farming.startMachineExercise(machineData)
-    task.spawn(function(generation)
-        while utils.isCurrent() and machineData.Running and machineData.Generation == generation do
-            if machineData.ActiveMachine then utils.playerData.Player.muscleEvent:FireServer("rep") end
-            task.wait(0.1)
-        end
-    end, machineData.Generation)
-end
-
-tabs.farming.addMachineDropdown("Select Squat", tabs.farming.MachineExerciseData.Squat, tabs.farming.SquatMachineNames)
-tabs.farming.SquatExerciseSwitch = tabs.farming:AddSwitch("Auto Squat", function(state)
-    tabs.farming.setMachineExerciseState(tabs.farming.MachineExerciseData.Squat, tabs.farming.MachineExerciseData.Lift, state)
-end)
-
-tabs.farming.addMachineDropdown("Select Lift", tabs.farming.MachineExerciseData.Lift, tabs.farming.LiftMachineNames)
-tabs.farming.LiftExerciseSwitch = tabs.farming:AddSwitch("Auto Lift", function(state)
-    tabs.farming.setMachineExerciseState(tabs.farming.MachineExerciseData.Lift, tabs.farming.MachineExerciseData.Squat, state)
-end)
-
-tabs.farming.AutoRepRunning = false
-tabs.farming.AutoRepSwitch = tabs.farming:AddSwitch("Auto Rep", function(state)
-    tabs.farming.AutoRepRunning = state
-    if not state then return end
-    task.spawn(function()
-        while utils.isCurrent() and tabs.farming.AutoRepRunning do
-            utils.playerData.Player.muscleEvent:FireServer("rep")
-            task.wait(0.1)
-        end
-    end)
-end)
-
+-- Auto Rock con Caché optimizado
 tabs.farming:AddLabel("Auto Rock:")
 tabs.farming.RockData = {
     Data = {["Tiny Rock - 0 Dura"] = 0, ["Large Rock - 100 Dura"] = 100, ["Punching Rock - 10 Dura"] = 10,
@@ -625,28 +391,39 @@ tabs.farming.RockData = {
 tabs.farming.RockDropdown = tabs.farming:AddDropdown("Select Rock", function(selection) tabs.farming.RockData.SelectedRock = selection end)
 for rockName in pairs(tabs.farming.RockData.Data) do tabs.farming.RockDropdown:Add(rockName) end
 
-tabs.farming.RockSwitch = tabs.farming:AddSwitch("Auto Rock", function(enabled)
+tabs.farming:AddSwitch("Auto Rock", function(enabled)
     getgenv().RockFarmRunning = enabled
     if enabled and tabs.farming.RockData.SelectedRock then
         task.spawn(function()
+            local targetDura = tabs.farming.RockData.Data[tabs.farming.RockData.SelectedRock]
+            local cachedRock = nil
             while utils.isCurrent() and getgenv().RockFarmRunning do
                 task.wait(0.12)
-                if utils.playerData.Player.Durability.Value >= tabs.farming.RockData.Data[tabs.farming.RockData.SelectedRock] then
-                    for _, v in pairs(tabs.farming.MachinesFolder:GetDescendants()) do
-                        if v.Name == "neededDurability" and v.Value == tabs.farming.RockData.Data[tabs.farming.RockData.SelectedRock] and
-                           utils.playerData.Player.Character:FindFirstChild("LeftHand") and v.Parent:FindFirstChild("Rock") then
-                            firetouchinterest(v.Parent.Rock, utils.playerData.Player.Character.RightHand, 0)
-                            firetouchinterest(v.Parent.Rock, utils.playerData.Player.Character.RightHand, 1)
-                            firetouchinterest(v.Parent.Rock, utils.playerData.Player.Character.LeftHand, 0)
-                            firetouchinterest(v.Parent.Rock, utils.playerData.Player.Character.LeftHand, 1)
+                pcall(function()
+                    if utils.playerData.Player.Durability.Value >= targetDura then
+                        if not cachedRock or not cachedRock.Parent then
+                            for _, v in pairs(tabs.farming.MachinesFolder:GetDescendants()) do
+                                if v.Name == "neededDurability" and v.Value == targetDura and v.Parent:FindFirstChild("Rock") then
+                                    cachedRock = v.Parent.Rock
+                                    break
+                                end
+                            end
+                        end
+                        local char = utils.playerData.Player.Character
+                        if cachedRock and char and char:FindFirstChild("LeftHand") then
+                            firetouchinterest(cachedRock, char.RightHand, 0)
+                            firetouchinterest(cachedRock, char.RightHand, 1)
+                            firetouchinterest(cachedRock, char.LeftHand, 0)
+                            firetouchinterest(cachedRock, char.LeftHand, 1)
                         end
                     end
-                end
+                end)
             end
         end)
     end
 end)
 
+-- Better Strength Farming configs
 tabs.farming:AddLabel("Better Strength Farming:")
 tabs.farming.Configs = {
     {name = "Pushup + Industrial Rock", tool = "Pushups", rock = "Industrial Rock"},
@@ -691,9 +468,9 @@ for _, config in ipairs(tabs.farming.Configs) do
 end
 
 -- ==========================================
--- FULL FARM TAB (FAST REPS)
+-- FULL FARM TAB (CON CALCULADORA COMPLETA)
 -- ==========================================
-tabs.fullFarm:AddLabel("⚡ Fast Reps (Strength):")
+tabs.fullFarm:AddLabel("⚡ Fast Reps & Calculadora (Strength):")
 tabs.fullFarm.leaderstats = lp.player:WaitForChild("leaderstats")
 tabs.fullFarm.strength = tabs.fullFarm.leaderstats:WaitForChild("Strength")
 tabs.fullFarm.durability = lp.player:WaitForChild("Durability")
@@ -836,8 +613,6 @@ tabs.fullFarm:AddTextBox("Max reps/s: " .. tabs.fullFarm.maxSendRate, function(i
     end
 end, {clear = false})
 
-tabs.fullFarm:AddLabel("Recommended Speed: 659, more = lag")
-
 tabs.fullFarm.FastRepToggle = tabs.fullFarm:AddSwitch("Fast Rep", function(state)
     tabs.fullFarm.running = state
     if state then
@@ -884,34 +659,17 @@ end)
 -- CONFIGS TAB
 -- ==========================================
 tabs.configs:AddLabel("⚙️ Automatización Rápida:")
-
 tabs.configs:AddSwitch("Rebirth in Industrial", function(state)
     if state then
         pcall(function()
             local char = lp.player.Character or lp.player.CharacterAdded:Wait()
             local hrp = char:WaitForChild("HumanoidRootPart")
             hrp.CFrame = CFrame.new(Vector3.new(-5491.68945, 81.2379913, 4643.85791))
-            hrp.AssemblyLinearVelocity = Vector3.zero
-            hrp.AssemblyAngularVelocity = Vector3.zero
-            task.wait(0.4)
+            task.wait(3)
             services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
             task.wait(0.1)
             services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
         end)
-        task.wait(0.5)
-        if tabs.fullFarm and tabs.fullFarm.FastRepToggle then
-            tabs.fullFarm.FastRepToggle:Set(true)
-        end
-        if tabs.fullRebirth and tabs.fullRebirth.FastRebirthV2Toggle then
-            tabs.fullRebirth.FastRebirthV2Toggle:Set(true)
-        end
-    else
-        if tabs.fullFarm and tabs.fullFarm.FastRepToggle then
-            tabs.fullFarm.FastRepToggle:Set(false)
-        end
-        if tabs.fullRebirth and tabs.fullRebirth.FastRebirthV2Toggle then
-            tabs.fullRebirth.FastRebirthV2Toggle:Set(false)
-        end
     end
 end)
 
@@ -921,34 +679,18 @@ tabs.configs:AddSwitch("Rebirth Overcharge", function(state)
             local char = lp.player.Character or lp.player.CharacterAdded:Wait()
             local hrp = char:WaitForChild("HumanoidRootPart")
             hrp.CFrame = CFrame.new(Vector3.new(-3023.363, 151.797, 4696.859))
-            hrp.AssemblyLinearVelocity = Vector3.zero
-            hrp.AssemblyAngularVelocity = Vector3.zero
-            task.wait(0.4)
+            task.wait(3)
             services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
             task.wait(0.1)
             services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
         end)
-        task.wait(0.5)
-        if tabs.fullFarm and tabs.fullFarm.FastRepToggle then
-            tabs.fullFarm.FastRepToggle:Set(true)
-        end
-        if tabs.fullRebirth and tabs.fullRebirth.FastRebirthV2Toggle then
-            tabs.fullRebirth.FastRebirthV2Toggle:Set(true)
-        end
-    else
-        if tabs.fullFarm and tabs.fullFarm.FastRepToggle then
-            tabs.fullFarm.FastRepToggle:Set(false)
-        end
-        if tabs.fullRebirth and tabs.fullRebirth.FastRebirthV2Toggle then
-            tabs.fullRebirth.FastRebirthV2Toggle:Set(false)
-        end
     end
 end)
 
 -- ==========================================
--- FULL REBIRTH TAB (Incluye Auto King)
+-- FULL REBIRTH TAB (CON CALCULADORA COMPLETA & AUTO KING)
 -- ==========================================
-tabs.fullRebirth:AddLabel("🔄 Fast Rebirth V2 & Horarybrech Calculadora (Unificado):")
+tabs.fullRebirth:AddLabel("🔄 Fast Rebirth V2 & Calculadora:")
 
 tabs.fullRebirth.TargetRebirths = 0
 tabs.fullRebirth:AddTextBox("Meta Global de Rebirths (0 = Infinito):", function(val)
@@ -970,24 +712,23 @@ tabs.fullRebirth.FastRebirthV2Data = {
     UsePackPets = true,
     PackPets = {"Titanium Hydra", "Tribal Overlord"},
     RepPets = {"Omega Overlord", "Swift Samurai"},
-    GolemPets = {"Powercore Hound", "Mighty Monster", "Wild Wizard", "Chaos Sorcerer", "Mythic Boss Pet", "Legendary Boss Pet", "Epic Boss Pet", "Rainbow Boss Pet"}
+    GolemPets = {"Powercore Hound", "Mighty Monster", "Wild Wizard", "Chaos Sorcerer"}
 }
 
+-- Etiquetas de la Calculadora de Rebirths
 tabs.fullRebirth.FastRebirthV2Status = tabs.fullRebirth:AddLabel("Status: Inactive")
 tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 80, 80)
 tabs.fullRebirth.FastRebirthV2Stats = tabs.fullRebirth:AddLabel("Rebirths: 0 | Gained: 0")
-tabs.fullRebirth.FastRebirthV2Speed = tabs.fullRebirth:AddLabel("Speed: --/min")
-
+tabs.fullRebirth.FastRebirthV2Speed = tabs.fullRebirth:AddLabel("Speed: 0 rebirths/s")
 tabs.fullRebirth.MissingLabel = tabs.fullRebirth:AddLabel("Rebirths Faltantes: 0")
 tabs.fullRebirth.AvgTimeLabel = tabs.fullRebirth:AddLabel("Velocidad: Calculando...")
 tabs.fullRebirth.EtaLabel = tabs.fullRebirth:AddLabel("Tiempo Estimado: --h --m --s")
 tabs.fullRebirth.EtaLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
 
-tabs.fullRebirth.equipPetsByNameV2 = function(petNames, maxPets)
+local function equipPetsByNameV2(petNames, maxPets)
     maxPets = maxPets or 12
     local uniquePets = utils.playerData.Player.petsFolder.Unique
     local equipped = 0
-    
     for _, folder in pairs(utils.playerData.Player.petsFolder:GetChildren()) do
         if folder:IsA("Folder") and folder.Name ~= "Unique" then
             for _, pet in pairs(folder:GetChildren()) do
@@ -996,7 +737,6 @@ tabs.fullRebirth.equipPetsByNameV2 = function(petNames, maxPets)
         end
     end
     task.wait(0.1)
-    
     for _, petName in ipairs(petNames) do
         if equipped >= maxPets then break end
         for _, pet in pairs(uniquePets:GetChildren()) do
@@ -1016,6 +756,7 @@ tabs.fullRebirth.FastRebirthV2Worker = function()
     tabs.fullRebirth.FastRebirthV2Data.TotalRebirths = 0
     local lastCheck = tick()
     local lastRebirthCount = startRebirths
+    local startTime = tick()
     
     while utils.isCurrent() and tabs.fullRebirth.FastRebirthV2Data.Running do
         if tabs.fullRebirth.FastRebirthV2Data.TargetRebirths > 0 and tabs.fullRebirth.FastRebirthV2Data.Rebirths.Value >= tabs.fullRebirth.FastRebirthV2Data.TargetRebirths then
@@ -1025,63 +766,64 @@ tabs.fullRebirth.FastRebirthV2Worker = function()
             break
         end
         
-        tabs.fullRebirth.FastRebirthV2Status.Text = "Status: ⚡ Equipando velocidad..."
-        tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 200, 80)
-        pcall(function() tabs.fullRebirth.equipPetsByNameV2(tabs.fullRebirth.FastRebirthV2Data.RepPets, 12) end)
+        pcall(function() equipPetsByNameV2(tabs.fullRebirth.FastRebirthV2Data.RepPets, 12) end)
         task.wait(0.3)
         
         local currentRebirths = tabs.fullRebirth.FastRebirthV2Data.Rebirths.Value
         local targetStrength = 5000 + currentRebirths * 2550
         local repsPerBurst = utils.playerData.Player.MembershipType == Enum.MembershipType.Premium and 6 or 12
         
-        tabs.fullRebirth.FastRebirthV2Status.Text = "Status: 💪 Farmeando... " .. utils.formatNumber(tabs.fullRebirth.FastRebirthV2Data.Strength.Value) .. " / " .. utils.formatNumber(targetStrength)
-        tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(80, 255, 120)
-        
         while utils.isCurrent() and tabs.fullRebirth.FastRebirthV2Data.Running and tabs.fullRebirth.FastRebirthV2Data.Strength.Value < targetStrength do
             for i = 1, repsPerBurst do
                 pcall(function() utils.remotes.MuscleEvent:FireServer("rep") end)
             end
             task.wait(0.02)
-            tabs.fullRebirth.FastRebirthV2Stats.Text = "Rebirths: " .. utils.formatWithCommas(tabs.fullRebirth.FastRebirthV2Data.Rebirths.Value) .. " | Gained: " .. utils.formatWithCommas(tabs.fullRebirth.FastRebirthV2Data.Rebirths.Value - startRebirths)
         end
         
         if utils.isCurrent() and tabs.fullRebirth.FastRebirthV2Data.Running and tabs.fullRebirth.FastRebirthV2Data.Strength.Value >= targetStrength then
             if tabs.fullRebirth.FastRebirthV2Data.UsePackPets then
-                tabs.fullRebirth.FastRebirthV2Status.Text = "Status: 🎁 Equipando packs..."
-                tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 150, 255)
-                pcall(function() tabs.fullRebirth.equipPetsByNameV2(tabs.fullRebirth.FastRebirthV2Data.PackPets, 12) end)
-                task.wait(0.5)
+                pcall(function() equipPetsByNameV2(tabs.fullRebirth.FastRebirthV2Data.PackPets, 12) end)
+                task.wait(0.4)
             end
-            
-            tabs.fullRebirth.FastRebirthV2Status.Text = "Status: 🔄 Haciendo rebirth..."
-            tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 200, 80)
             
             local rebirthValueBefore = tabs.fullRebirth.FastRebirthV2Data.Rebirths.Value
             local attempts = 0
-            
             repeat
                 pcall(function() services.ReplicatedStorage.rEvents.rebirthRemote:InvokeServer("rebirthRequest") end)
                 task.wait(0.05)
                 attempts = attempts + 1
-            until not tabs.fullRebirth.FastRebirthV2Data.Running or tabs.fullRebirth.FastRebirthV2Data.Rebirths.Value > rebirthValueBefore or attempts >= 50
-            
-            if tabs.fullRebirth.FastRebirthV2Data.Rebirths.Value > rebirthValueBefore then
-                tabs.fullRebirth.FastRebirthV2Data.TotalRebirths = tabs.fullRebirth.FastRebirthV2Data.TotalRebirths + (tabs.fullRebirth.FastRebirthV2Data.Rebirths.Value - rebirthValueBefore)
-            end
+            until not tabs.fullRebirth.FastRebirthV2Data.Running or tabs.fullRebirth.FastRebirthV2Data.Rebirths.Value > rebirthValueBefore or attempts >= 40
             
             if tabs.fullRebirth.FastRebirthV2Data.UseGolems then
-                tabs.fullRebirth.FastRebirthV2Status.Text = "Status: 🐾 Re-equipando golems..."
-                tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(150, 200, 255)
-                task.wait(0.5)
-                pcall(function() tabs.fullRebirth.equipPetsByNameV2(tabs.fullRebirth.FastRebirthV2Data.GolemPets, 12) end)
+                task.wait(0.4)
+                pcall(function() equipPetsByNameV2(tabs.fullRebirth.FastRebirthV2Data.GolemPets, 12) end)
             end
         end
         
+        -- Actualización de la Calculadora de Rebirths
+        local currentCount = tabs.fullRebirth.FastRebirthV2Data.Rebirths.Value
+        local gained = currentCount - startRebirths
+        tabs.fullRebirth.FastRebirthV2Stats.Text = "Rebirths: " .. utils.formatWithCommas(currentCount) .. " | Gained: " .. utils.formatWithCommas(gained)
+        
         if tick() - lastCheck >= 1 then
-            local currentCount = tabs.fullRebirth.FastRebirthV2Data.Rebirths.Value
-            local gained = currentCount - lastRebirthCount
-            tabs.fullRebirth.FastRebirthV2Speed.Text = "Speed: " .. gained .. " rebirths/s"
-            lastRebirthCount = currentCount
+            local secElapsed = tick() - startTime
+            if gained > 0 then
+                local avgSecPerRb = secElapsed / gained
+                tabs.fullRebirth.AvgTimeLabel.Text = string.format("Velocidad: %.2f s/rebirth", avgSecPerRb)
+                
+                if tabs.fullRebirth.TargetRebirths > 0 then
+                    local missing = math.max(0, tabs.fullRebirth.TargetRebirths - currentCount)
+                    tabs.fullRebirth.MissingLabel.Text = "Rebirths Faltantes: " .. utils.formatWithCommas(missing)
+                    local etaSec = missing * avgSecPerRb
+                    local etaH = math.floor(etaSec / 3600)
+                    local etaM = math.floor((etaSec % 3600) / 60)
+                    local etaS = math.floor(etaSec % 60)
+                    tabs.fullRebirth.EtaLabel.Text = string.format("Tiempo Estimado: %dh %dm %ds", etaH, etaM, etaS)
+                else
+                    tabs.fullRebirth.MissingLabel.Text = "Rebirths Faltantes: Infinito"
+                    tabs.fullRebirth.EtaLabel.Text = "Tiempo Estimado: --h --m --s"
+                end
+            end
             lastCheck = tick()
         end
         task.wait(0.3)
@@ -1091,11 +833,12 @@ end
 
 tabs.fullRebirth:AddSwitch("V2 - Usar Golems después del rebirth", function(state) tabs.fullRebirth.FastRebirthV2Data.UseGolems = state end):Set(true)
 tabs.fullRebirth:AddSwitch("V2 - Usar Packs (x2 Rebirths)", function(state) tabs.fullRebirth.FastRebirthV2Data.UsePackPets = state end):Set(true)
+
 tabs.fullRebirth.FastRebirthV2Toggle = tabs.fullRebirth:AddSwitch("Fast Rebirth V2 🔄 (Auto Unificado)", function(state)
     tabs.fullRebirth.FastRebirthV2Data.Running = state
     tabs.fullRebirth.FastRebirthV2Data.TargetRebirths = tabs.fullRebirth.TargetRebirths
     if state then
-        tabs.fullRebirth.FastRebirthV2Status.Text = "Status: 🔄 Iniciando V2..."
+        tabs.fullRebirth.FastRebirthV2Status.Text = "Status: 🔄 Ejecutándose..."
         tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(80, 255, 120)
         if not tabs.fullRebirth.FastRebirthV2Data.WorkerActive then
             tabs.fullRebirth.FastRebirthV2Data.WorkerActive = true
@@ -1111,35 +854,21 @@ end)
 tabs.fullRebirth:AddLabel("")
 tabs.fullRebirth:AddLabel("👑 Auto King:")
 tabs.fullRebirth.KingData = {TargetPosition = CFrame.new(-8665.4, 17.21, -5792.9), TeleportActive = false}
-tabs.fullRebirth.KingSwitch = tabs.fullRebirth:AddSwitch("Auto King", function(enabled)
-    tabs.fullRebirth.KingData.TeleportActive = enabled
-end)
+tabs.fullRebirth:AddSwitch("Auto King", function(enabled) tabs.fullRebirth.KingData.TeleportActive = enabled end)
 
 task.spawn(function()
-    while utils.isCurrent() and true do
+    while utils.isCurrent() do
         if tabs.fullRebirth.KingData.TeleportActive then
-            if not utils.playerData.Character or not utils.playerData.Character:FindFirstChildOfClass("Humanoid") then
-                utils.playerData.Player.CharacterAdded:Wait()
-                utils.playerData.Character = utils.playerData.Player.Character
-                task.wait(2)
-            end
-            if not utils.playerData.Humanoid or utils.playerData.Humanoid.Health <= 0 then
-                repeat
-                    task.wait(0.5)
-                    utils.playerData.Character = utils.playerData.Player.Character
-                    utils.playerData.Humanoid = utils.playerData.Character and utils.playerData.Character:FindFirstChildOfClass("Humanoid")
-                until utils.playerData.Character and utils.playerData.Humanoid and utils.playerData.Humanoid.Health > 0
-                task.wait(1)
-            end
-            if utils.playerData.Character and utils.playerData.Character:FindFirstChild("HumanoidRootPart") then
-                if (utils.playerData.Character.HumanoidRootPart.Position - tabs.fullRebirth.KingData.TargetPosition.Position).magnitude > 5 then
-                    pcall(function()
-                        utils.playerData.Character.HumanoidRootPart.CFrame = tabs.fullRebirth.KingData.TargetPosition
-                    end)
+            pcall(function()
+                local char = utils.playerData.Player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp and (hrp.Position - tabs.fullRebirth.KingData.TargetPosition.Position).magnitude > 5 then
+                    hrp.CFrame = tabs.fullRebirth.KingData.TargetPosition
+                    hrp.AssemblyLinearVelocity = Vector3.zero
                 end
-            end
+            end)
         end
-        task.wait(0.05)
+        task.wait(0.5)
     end
 end)
 
@@ -1150,47 +879,26 @@ tabs.boss:AddLabel("Boss Farming:")
 tabs.boss.StatusLabel = tabs.boss:AddLabel("Status: Waiting for Boss")
 tabs.boss.BossLabel = tabs.boss:AddLabel("Boss: None")
 tabs.boss.HealthLabel = tabs.boss:AddLabel("Health: 0 / 0")
-tabs.boss.NextBossLabel = tabs.boss:AddLabel("Next Boss: N/A")
 
 tabs.boss.Data = {
     Running = false,
     Generation = 0,
     ContinueTraining = true,
     Phase = "Waiting",
-    TrainingSnapshot = nil,
     PunchInterval = 0.3,
     LastPunch = 0,
-    AttackSequence = nil,
-    EvadeUntil = 0,
-    EvadeDistance = 230,
-    PunchBehindDistance = 45,
-    StompHealthThreshold = 0.35,
-    DodgeStomps = false,
-    BossConfig = nil,
     Bosses = {},
     BossOrder = {},
     BossByDisplayName = {},
     SelectedBosses = {}
 }
 
-tabs.boss.SelectedBossesLabel = tabs.boss:AddLabel("Targeted Bosses: Detecting...")
 tabs.boss.BossDropdown = tabs.boss:AddDropdown("Target specific Bosses", function(displayName)
-    tabs.boss.runtime.bossModelName = tabs.boss.Data.BossByDisplayName[displayName]
-    if tabs.boss.runtime.bossModelName then
-        tabs.boss.Data.SelectedBosses[tabs.boss.runtime.bossModelName] = not tabs.boss.Data.SelectedBosses[tabs.boss.runtime.bossModelName]
-        tabs.boss.updateSelectedBossesLabel()
+    local modelName = tabs.boss.Data.BossByDisplayName[displayName]
+    if modelName then
+        tabs.boss.Data.SelectedBosses[modelName] = not tabs.boss.Data.SelectedBosses[modelName]
     end
 end)
-
-tabs.boss.updateSelectedBossesLabel = function()
-    local selectedNames = {}
-    for _, modelName in ipairs(tabs.boss.Data.BossOrder) do
-        if tabs.boss.Data.SelectedBosses[modelName] then
-            table.insert(selectedNames, (string.gsub(tabs.boss.Data.Bosses[modelName], "%s+[Bb][Oo][Ss][Ss]$", "")))
-        end
-    end
-    tabs.boss.SelectedBossesLabel.Text = "Targeted Bosses: " .. (#selectedNames > 0 and table.concat(selectedNames, ", ") or "None")
-end
 
 tabs.boss.addBossChoice = function(modelName, displayName)
     modelName = tostring(modelName or "")
@@ -1201,19 +909,16 @@ tabs.boss.addBossChoice = function(modelName, displayName)
     tabs.boss.Data.SelectedBosses[modelName] = true
     table.insert(tabs.boss.Data.BossOrder, modelName)
     tabs.boss.BossDropdown:Add(displayName)
-    tabs.boss.updateSelectedBossesLabel()
 end
 
-tabs.boss.runtime.configSuccess, tabs.boss.Data.BossConfig = pcall(function()
-    return require(services.ReplicatedStorage:WaitForChild("shared"):WaitForChild("config"):WaitForChild("BossEventConfig"))
-end)
-if tabs.boss.runtime.configSuccess and tabs.boss.Data.BossConfig and tabs.boss.Data.BossConfig.RARITIES then
-    for _, rarity in ipairs(tabs.boss.Data.BossConfig.RARITIES) do
-        tabs.boss.addBossChoice(rarity.BossModel, rarity.DisplayName or rarity.Name or rarity.BossModel)
+pcall(function()
+    local config = require(services.ReplicatedStorage:WaitForChild("shared"):WaitForChild("config"):WaitForChild("BossEventConfig"))
+    if config and config.RARITIES then
+        for _, rarity in ipairs(config.RARITIES) do
+            tabs.boss.addBossChoice(rarity.BossModel, rarity.DisplayName or rarity.Name or rarity.BossModel)
+        end
     end
-else
-    tabs.boss.SelectedBossesLabel.Text = "Farmed Bosses: Waiting for detection"
-end
+end)
 
 tabs.boss.shouldFarmBoss = function(model)
     if not tabs.boss.Data.Bosses[model.Name] then
@@ -1222,575 +927,164 @@ tabs.boss.shouldFarmBoss = function(model)
     return tabs.boss.Data.SelectedBosses[model.Name] == true
 end
 
-tabs.boss.findActiveBoss = function(model, stats, health, maxHealth, hitbox)
+tabs.boss.findActiveBoss = function()
     for _, candidate in ipairs(services.CollectionService:GetTagged("BossEventBoss")) do
         if candidate:IsA("Model") and candidate:IsDescendantOf(services.Workspace) then
-            model = candidate
-            break
-        end
-    end
-    if not model then
-        tabs.boss.runtime.events = services.Workspace:FindFirstChild("Events")
-        tabs.boss.runtime.bossFolder = tabs.boss.runtime.events and (tabs.boss.runtime.events:FindFirstChild("BossEvent") or tabs.boss.runtime.events:FindFirstChild("BossArena"))
-        if tabs.boss.runtime.bossFolder then
-            for _, candidate in ipairs(tabs.boss.runtime.bossFolder:GetDescendants()) do
-                if candidate:IsA("Model") and (candidate:FindFirstChild("BossDamageHitbox") or candidate:HasTag("BossEventBoss")) then
-                    model = candidate
-                    break
-                end
+            local stats = candidate:FindFirstChild("stats")
+            local health = stats and stats:FindFirstChild("Health")
+            local maxHealth = stats and stats:FindFirstChild("MaxHealth")
+            local hitbox = candidate:FindFirstChild("BossDamageHitbox", true)
+            if hitbox and hitbox:IsA("BasePart") then
+                return candidate, health, maxHealth, hitbox
             end
         end
     end
-    if not model then return end
-    stats = model:FindFirstChild("stats")
-    health = stats and stats:FindFirstChild("Health")
-    maxHealth = stats and stats:FindFirstChild("MaxHealth")
-    hitbox = model:FindFirstChild("BossDamageHitbox", true)
-    if not hitbox or not hitbox:IsA("BasePart") then return end
-    tabs.boss.runtime.currentHealth = health and health.Value or services.Workspace:GetAttribute("BossHealth")
-    if typeof(tabs.boss.runtime.currentHealth) == "number" and tabs.boss.runtime.currentHealth <= 0 then return end
-    return model, health, maxHealth, hitbox
 end
 
-tabs.boss.getBossHealth = function(health) return health and health.Value or services.Workspace:GetAttribute("BossHealth") or 0 end
-tabs.boss.getBossMaxHealth = function(maxHealth) return maxHealth and maxHealth.Value or services.Workspace:GetAttribute("BossMaxHealth") or 0 end
-tabs.boss.formatCountdown = function(seconds, hours, minutes)
-    seconds = math.max(0, math.floor(seconds or 0))
-    hours = math.floor(seconds / 3600)
-    minutes = math.floor(seconds % 3600 / 60)
-    seconds = seconds % 60
-    return string.format("%dh %dmin %ds", hours, minutes, seconds)
-end
-
-tabs.boss.leaveExerciseMachine = function(character, humanoid, root)
-    character = utils.playerData.Player.Character
-    humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    root = character and character:FindFirstChild("HumanoidRootPart")
-    if not humanoid or humanoid.Health <= 0 then return end
-    pcall(function()
-        services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-        humanoid.Sit = false
-        humanoid.Jump = true
-        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-        if root then root.AssemblyLinearVelocity = Vector3.new(0, math.max(root.AssemblyLinearVelocity.Y, 50), 0) end
-    end)
-    pcall(function() services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game) end)
-    task.wait(0.2)
-end
-
-tabs.boss.pauseTraining = function()
-    if tabs.boss.Data.TrainingSnapshot then return end
-    tabs.boss.Data.TrainingSnapshot = {
-        Size = tabs.farming.SizeData.Active,
-        King = tabs.fullRebirth.KingData.TeleportActive,
-        Tool = tabs.farming.ExerciseData.AutoFarm,
-        Squat = tabs.farming.MachineExerciseData.Squat.Running,
-        Lift = tabs.farming.MachineExerciseData.Lift.Running,
-        AutoRep = tabs.farming.AutoRepRunning,
-        Rock = getgenv().RockFarmRunning == true,
-        Configs = {}
-    }
-    for _, config in ipairs(tabs.farming.Configs) do
-        tabs.boss.Data.TrainingSnapshot.Configs[config.name] = tabs.farming.ActiveConfigs[config.name] == true
-        if tabs.farming.ActiveConfigs[config.name] and config.Switch then config.Switch:Set(false) end
-    end
-    if tabs.boss.Data.TrainingSnapshot.Size then tabs.farming.SizeSwitch:Set(false) end
-    if tabs.boss.Data.TrainingSnapshot.King then tabs.fullRebirth.KingSwitch:Set(false) end
-    if tabs.boss.Data.TrainingSnapshot.Tool then tabs.farming.ToolExerciseSwitch:Set(false) end
-    if tabs.boss.Data.TrainingSnapshot.Squat then tabs.farming.SquatExerciseSwitch:Set(false) end
-    if tabs.boss.Data.TrainingSnapshot.Lift then tabs.farming.LiftExerciseSwitch:Set(false) end
-    if tabs.boss.Data.TrainingSnapshot.Squat or tabs.boss.Data.TrainingSnapshot.Lift then tabs.boss.leaveExerciseMachine() end
-    if tabs.boss.Data.TrainingSnapshot.AutoRep then tabs.farming.AutoRepSwitch:Set(false) end
-    if tabs.boss.Data.TrainingSnapshot.Rock then tabs.farming.RockSwitch:Set(false) end
-end
-
-tabs.boss.resumeTraining = function(snapshot)
-    snapshot = tabs.boss.Data.TrainingSnapshot
-    if not snapshot then return end
-    tabs.boss.Data.TrainingSnapshot = nil
-    if snapshot.Size then tabs.farming.SizeSwitch:Set(true) end
-    if snapshot.King then tabs.fullRebirth.KingSwitch:Set(true) end
-    if snapshot.Tool then tabs.farming.ToolExerciseSwitch:Set(true) end
-    if snapshot.Squat then tabs.farming.SquatExerciseSwitch:Set(true) end
-    if snapshot.Lift then tabs.farming.LiftExerciseSwitch:Set(true) end
-    if snapshot.AutoRep then tabs.farming.AutoRepSwitch:Set(true) end
-    if snapshot.Rock then tabs.farming.RockSwitch:Set(true) end
-    for _, config in ipairs(tabs.farming.Configs) do
-        if snapshot.Configs[config.name] and config.Switch then config.Switch:Set(true) end
-    end
-end
-
-tabs.boss.getBossHeadPosition = function(model, hitbox, head)
-    head = model:FindFirstChild("Head", true) or model:FindFirstChild("head", true)
-    if head and head:IsA("BasePart") then return head.Position end
-    if head and head:IsA("Bone") then return head.WorldPosition end
-    return hitbox.Position + Vector3.new(0, hitbox.Size.Y * 0.35, 0)
-end
-
-tabs.boss.getAliveCharacter = function(generation, timeout, startedAt, character, root, humanoid)
-    startedAt = os.clock()
-    repeat
-        character = utils.playerData.Player.Character
-        root = character and character:FindFirstChild("HumanoidRootPart")
-        humanoid = character and character:FindFirstChildOfClass("Humanoid")
-        if root and humanoid and humanoid.Health > 0 then
-            utils.playerData.Character = character
-            utils.playerData.Humanoid = humanoid
-            return character, root, humanoid
-        end
-        tabs.boss.StatusLabel.Text = "Status: Waiting for Respawn"
-        task.wait(0.1)
-    until not tabs.boss.Data.Running or tabs.boss.Data.Generation ~= generation or (timeout and os.clock() - startedAt >= timeout)
-end
-
-tabs.boss.evadeAttack = function(model, hitbox, root, humanoid, sequence, attackKind, attackCFrame, impactTime, direction, safePosition, center)
-    sequence = model:GetAttribute("BossAttackSequence")
-    attackKind = model:GetAttribute("BossAttackKind")
-    attackCFrame = model:GetAttribute("BossAttackCFrame")
-    impactTime = model:GetAttribute("BossAttackImpactTime")
-
-    if typeof(sequence) == "number" and sequence ~= tabs.boss.Data.AttackSequence then
-        tabs.boss.Data.AttackSequence = sequence
-        if typeof(attackKind) == "string" and typeof(attackCFrame) == "CFrame" and typeof(impactTime) == "number" then
-            tabs.boss.Data.EvadeUntil = impactTime + 0.6
-        end
-    end
-
-    if typeof(attackCFrame) ~= "CFrame" or services.Workspace:GetServerTimeNow() > tabs.boss.Data.EvadeUntil then return end
-
-    attackKind = string.lower(tostring(attackKind or ""))
-    if string.find(attackKind, "punch", 1, true) then
-        center = tabs.boss.getBossHeadPosition(model, hitbox)
-        direction = Vector3.new(attackCFrame.LookVector.X, 0, attackCFrame.LookVector.Z)
-        if direction.Magnitude < 1 then direction = Vector3.new(hitbox.CFrame.LookVector.X, 0, hitbox.CFrame.LookVector.Z) end
-        if direction.Magnitude < 1 then direction = Vector3.new(0, 0, 1) end
-        safePosition = center - direction.Unit * tabs.boss.Data.PunchBehindDistance
-        root.CFrame = CFrame.lookAt(safePosition, center)
-        root.AssemblyLinearVelocity = Vector3.zero
-        root.AssemblyAngularVelocity = Vector3.zero
-        tabs.boss.StatusLabel.Text = "Status: Dodging Punch"
-        return "Punch"
-    end
-
-    if not string.find(attackKind, "stomp", 1, true) then return end
-    if humanoid.Health / math.max(humanoid.MaxHealth, 1) <= tabs.boss.Data.StompHealthThreshold then
-        tabs.boss.Data.DodgeStomps = true
-    end
-    if not tabs.boss.Data.DodgeStomps then return end
-
-    direction = Vector3.new(root.Position.X - attackCFrame.Position.X, 0, root.Position.Z - attackCFrame.Position.Z)
-    if direction.Magnitude < 1 then direction = Vector3.new(-attackCFrame.LookVector.X, 0, -attackCFrame.LookVector.Z) end
-    if direction.Magnitude < 1 then direction = Vector3.new(1, 0, 0) end
-    direction = direction.Unit
-    safePosition = attackCFrame.Position + direction * tabs.boss.Data.EvadeDistance + Vector3.new(0, 18, 0)
-    root.CFrame = CFrame.lookAt(safePosition, attackCFrame.Position)
-    root.AssemblyLinearVelocity = Vector3.zero
-    root.AssemblyAngularVelocity = Vector3.zero
-    tabs.boss.StatusLabel.Text = "Status: Dodging Stomp"
-    return "Stomp"
-end
-
-tabs.boss.attack = function(model, health, maxHealth, hitbox, character, root, humanoid, punch, leftHand, rightHand, center, position, evadeMode)
-    character = utils.playerData.Player.Character
-    root = character and character:FindFirstChild("HumanoidRootPart")
-    humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    if not root or not humanoid or humanoid.Health <= 0 then return end
-    evadeMode = tabs.boss.evadeAttack(model, hitbox, root, humanoid)
-    if evadeMode == "Stomp" then return end
-    punch = character:FindFirstChild("Punch") or utils.playerData.Backpack:FindFirstChild("Punch")
-    if punch and punch.Parent ~= character then humanoid:EquipTool(punch) end
-    leftHand = character:FindFirstChild("LeftHand")
-    rightHand = character:FindFirstChild("RightHand")
-    center = tabs.boss.getBossHeadPosition(model, hitbox)
-    if evadeMode ~= "Punch" then
-        position = center
-        root.CFrame = CFrame.lookAt(position, position + hitbox.CFrame.LookVector)
-    end
-    root.AssemblyLinearVelocity = Vector3.zero
-    root.AssemblyAngularVelocity = Vector3.zero
-    pcall(function()
-        if leftHand then firetouchinterest(hitbox, leftHand, 0); firetouchinterest(hitbox, leftHand, 1) end
-        if rightHand then firetouchinterest(hitbox, rightHand, 0); firetouchinterest(hitbox, rightHand, 1) end
-    end)
-
-    if os.clock() - tabs.boss.Data.LastPunch >= tabs.boss.Data.PunchInterval then
-        tabs.boss.Data.LastPunch = os.clock()
-        pcall(function()
-            utils.remotes.MuscleEvent:FireServer("punch", "leftHand")
-            utils.remotes.MuscleEvent:FireServer("punch", "rightHand")
-            if punch then punch:Activate() end
-        end)
-    end
-    tabs.boss.BossLabel.Text = "Boss: " .. (services.Workspace:GetAttribute("BossDisplayName") or model.Name)
-    tabs.boss.runtime.health = tabs.boss.getBossHealth(health)
-    tabs.boss.runtime.maxHealth = tabs.boss.getBossMaxHealth(maxHealth)
-    tabs.boss.HealthLabel.Text = "Health: " .. utils.formatNumber(tabs.boss.runtime.health) .. " / " .. utils.formatNumber(tabs.boss.runtime.maxHealth)
-end
-
-tabs.boss.findChest = function(chest, prompt, part)
-    for _, candidate in ipairs(services.CollectionService:GetTagged("BossEventChest")) do
-        if candidate:IsDescendantOf(services.Workspace) then chest = candidate break end
-    end
-    if not chest then chest = services.Workspace:FindFirstChild("BossChest", true) end
-    if not chest then
-        for _, candidate in ipairs(services.Workspace:GetDescendants()) do
-            if candidate:IsA("ProximityPrompt") and candidate.Name == "bossChestPrompt" then chest = candidate.Parent break end
-        end
-    end
-    if not chest then return end
-    prompt = chest:FindFirstChild("bossChestPrompt", true)
-    part = prompt and prompt.Parent or (chest:IsA("Model") and (chest.PrimaryPart or chest:FindFirstChildWhichIsA("BasePart", true))) or chest
-    if part and part:IsA("BasePart") then return chest, prompt, part end
-end
-
-tabs.boss.collectChest = function(generation, startedAt, chest, prompt, part, character, root)
-    tabs.boss.StatusLabel.Text = "Status: Waiting for Chest"
-    startedAt = os.clock()
-    repeat
-        chest, prompt, part = tabs.boss.findChest()
-        if chest and chest:GetAttribute("BossChestEmerging") ~= true then break end
-        task.wait(0.1)
-    until not tabs.boss.Data.Running or tabs.boss.Data.Generation ~= generation or os.clock() - startedAt >= 12
-    if not chest or not part then return end
-
-    tabs.boss.StatusLabel.Text = "Status: Collecting Chest"
-    startedAt = os.clock()
-    repeat
-        character, root = tabs.boss.getAliveCharacter(generation, 2)
-        if character and root and chest.Parent and part.Parent then
-            tabs.boss.StatusLabel.Text = "Status: Collecting Chest"
-            pcall(function()
-                root.CFrame = CFrame.lookAt(part.Position + Vector3.new(0, 3, 4), part.Position)
-                root.AssemblyLinearVelocity = Vector3.zero
-            end)
-            task.wait(0.15)
-            if prompt and prompt.Parent and fireproximityprompt then
-                pcall(function() fireproximityprompt(prompt) end)
-            else
-                pcall(function()
-                    services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                    task.wait(0.1)
-                    services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-                end)
-            end
-        end
-        task.wait(0.25)
-    until not tabs.boss.Data.Running or tabs.boss.Data.Generation ~= generation or utils.playerData.Player:GetAttribute("BossChestPending") == false or not chest.Parent or os.clock() - startedAt >= 12
-end
-
-tabs.boss.ContinueSwitch = tabs.boss:AddSwitch("Continue Farming after Boss Kill", function(state)
+tabs.boss:AddSwitch("Continue Farming after Boss Kill", function(state)
     tabs.boss.Data.ContinueTraining = state
-    if state and tabs.boss.Data.Phase == "Waiting" then tabs.boss.resumeTraining() end
-end)
-tabs.boss.ContinueSwitch:Set(true)
+end):Set(true)
 
-task.spawn(function(model, health, maxHealth, hitbox, currentHealth, currentMaxHealth, nextTime)
-    while utils.isCurrent() and true do
-        model, health, maxHealth, hitbox = tabs.boss.findActiveBoss()
-        if model then
-            currentHealth = tabs.boss.getBossHealth(health)
-            currentMaxHealth = tabs.boss.getBossMaxHealth(maxHealth)
-            tabs.boss.BossLabel.Text = "Boss: " .. (services.Workspace:GetAttribute("BossDisplayName") or model.Name)
-            tabs.boss.HealthLabel.Text = "Health: " .. utils.formatNumber(currentHealth) .. " / " .. utils.formatNumber(currentMaxHealth)
-            tabs.boss.NextBossLabel.Text = "Next Boss: Current boss active"
-        else
-            tabs.boss.BossLabel.Text = "Boss: None"
-            tabs.boss.HealthLabel.Text = "Health: 0 / 0"
-            nextTime = services.Workspace:GetAttribute("BossSpawnNextTime")
-            tabs.boss.NextBossLabel.Text = typeof(nextTime) == "number" and "Next Boss: " .. tabs.boss.formatCountdown(nextTime - services.Workspace:GetServerTimeNow()) or "Next Boss: N/A"
-        end
-        task.wait(0.25)
-    end
-end)
-
-tabs.boss.AutoFarmSwitch = tabs.boss:AddSwitch("Auto Farm Boss", function(state)
+tabs.boss:AddSwitch("Auto Farm Boss", function(state)
     tabs.boss.Data.Running = state
     tabs.boss.Data.Generation += 1
-    tabs.boss.runtime.generation = tabs.boss.Data.Generation
+    local gen = tabs.boss.Data.Generation
     if not state then
-        tabs.boss.Data.Phase = "Waiting"
         tabs.boss.StatusLabel.Text = "Status: Disabled"
-        tabs.boss.resumeTraining()
         return
     end
 
-    task.spawn(function(generation, wasFighting, model, health, maxHealth, hitbox, selected)
-        while utils.isCurrent() and tabs.boss.Data.Running and tabs.boss.Data.Generation == generation do
+    task.spawn(function()
+        while utils.isCurrent() and tabs.boss.Data.Running and tabs.boss.Data.Generation == gen do
             pcall(function()
-                model, health, maxHealth, hitbox = tabs.boss.findActiveBoss()
-                selected = model and tabs.boss.shouldFarmBoss(model)
-                if model and not selected then
-                    if wasFighting then
-                        wasFighting = false
-                        tabs.boss.resumeTraining()
+                local model, health, maxHealth, hitbox = tabs.boss.findActiveBoss()
+                if model and tabs.boss.shouldFarmBoss(model) then
+                    tabs.boss.StatusLabel.Text = "Status: Fighting Boss"
+                    local char = utils.playerData.Player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    local punch = char and char:FindFirstChild("Punch") or utils.playerData.Backpack:FindFirstChild("Punch")
+                    if hrp and hitbox then
+                        if punch and punch.Parent ~= char then char.Humanoid:EquipTool(punch) end
+                        hrp.CFrame = CFrame.lookAt(hitbox.Position + Vector3.new(0, 0, 15), hitbox.Position)
+                        hrp.AssemblyLinearVelocity = Vector3.zero
+                        utils.remotes.MuscleEvent:FireServer("punch", "leftHand")
+                        utils.remotes.MuscleEvent:FireServer("punch", "rightHand")
+                        if punch then punch:Activate() end
                     end
-                    tabs.boss.Data.Phase = "Waiting"
-                    tabs.boss.StatusLabel.Text = "Status: Skipping " .. (services.Workspace:GetAttribute("BossDisplayName") or model.Name)
-                elseif model then
-                    if not wasFighting then
-                        wasFighting = true
-                        tabs.boss.Data.Phase = "Fighting"
-                        tabs.boss.Data.AttackSequence = nil
-                        tabs.boss.Data.EvadeUntil = 0
-                        tabs.boss.Data.DodgeStomps = false
-                        tabs.boss.pauseTraining()
-                    end
-                    if utils.playerData.Player.Character and utils.playerData.Player.Character:FindFirstChildOfClass("Humanoid") and utils.playerData.Player.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
-                        tabs.boss.StatusLabel.Text = "Status: Fighting"
-                        tabs.boss.attack(model, health, maxHealth, hitbox)
-                    else
-                        tabs.boss.StatusLabel.Text = "Status: Waiting for Respawn"
-                    end
-                elseif wasFighting then
-                    wasFighting = false
-                    tabs.boss.Data.Phase = "Collecting"
-                    pcall(tabs.boss.collectChest, generation)
-                    tabs.boss.BossLabel.Text = "Boss: None"
-                    tabs.boss.HealthLabel.Text = "Health: 0 / 0"
-                    if tabs.boss.Data.ContinueTraining then tabs.boss.resumeTraining() end
-                    tabs.boss.Data.Phase = "Waiting"
-                    tabs.boss.StatusLabel.Text = "Status: Waiting for Boss"
                 else
                     tabs.boss.StatusLabel.Text = "Status: Waiting for Boss"
                 end
             end)
-            task.wait(model and selected and 0.03 or 0.25)
+            task.wait(0.1)
         end
-    end, tabs.boss.runtime.generation)
+    end)
 end)
 
 -- ==========================================
--- HORARYBRECH: OTHER TAB
+-- OTHER TAB (UTILIDADES & ANTI-LAG)
 -- ==========================================
 tabs.other.eggsowned = tabs.other:AddLabel("Protein Eggs: 0")
-tabs.other.eggsowned.TextSize = 14
 tabs.other.autoEgg = false
 tabs.other.autoShake = false
-tabs.other.autoSpinWheel = false
-tabs.other.hidePopups = true
-tabs.other.popupSwitchInitializing = true
-tabs.other.hidePets = true
-tabs.other.savePlayerSizeEvent = services.ReplicatedStorage.rEvents:WaitForChild("savePlayerSizeEvent")
-tabs.other.showPetsEvent = services.ReplicatedStorage.rEvents:WaitForChild("showPetsEvent")
 
 task.spawn(function()
     while true do
-        tabs.other.proteinEggCount = 0
-        tabs.other.backpack = lp.player:FindFirstChild("Backpack")
-        if tabs.other.backpack then
-            for _, item in ipairs(tabs.other.backpack:GetChildren()) do
-                if item.Name == "Protein Egg" then
-                    tabs.other.proteinEggCount = tabs.other.proteinEggCount + 1
-                end
+        local count = 0
+        local bp = lp.player:FindFirstChild("Backpack")
+        if bp then
+            for _, item in ipairs(bp:GetChildren()) do
+                if item.Name == "Protein Egg" then count = count + 1 end
             end
         end
-        tabs.other.eggsowned.Text = "Protein Eggs: " .. tabs.other.proteinEggCount
-        task.wait(1)
+        tabs.other.eggsowned.Text = "Protein Eggs: " .. count
+        task.wait(2)
     end
 end)
 
-tabs.other.x2str = tabs.other:AddLabel("x2 Strength: 00:00")
-tabs.other.x2str.TextSize = 14
-
-function formatTimeSilence(seconds)
-    return string.format("%dd %dh %dm %ds", math.floor(seconds / 86400), math.floor((seconds % 86400) / 3600), math.floor((seconds % 3600) / 60), seconds % 60)
-end
-
+tabs.other:AddSwitch("Eat Eggs", function(state) tabs.other.autoEgg = state end)
 task.spawn(function()
-    while true do
-        tabs.other.boostTimersFolder = lp.player:FindFirstChild("boostTimersFolder")
-        tabs.other.boost = tabs.other.boostTimersFolder and tabs.other.boostTimersFolder:FindFirstChild("Protein Egg")
-        tabs.other.seconds = (tabs.other.boost and tabs.other.boost:IsA("IntValue")) and tabs.other.boost.Value or 0
-        tabs.other.x2str.Text = "x2 Strength: " .. formatTimeSilence(tabs.other.seconds)
-        task.wait(0.5)
-    end
-end)
-
-function eatEgg()
-    tabs.other.character = lp.player.Character
-    tabs.other.backpack = lp.player:FindFirstChild("Backpack")
-    tabs.other.tool = (tabs.other.character and tabs.other.character:FindFirstChild("Protein Egg")) or (tabs.other.backpack and tabs.other.backpack:FindFirstChild("Protein Egg"))
-    if tabs.other.tool then
-        for _ = 1, 10 do
-            utils.remotes.MuscleEvent:FireServer("proteinEgg", tabs.other.tool)
-        end
-    end
-end
-
-task.spawn(function()
-    while true do
+    while utils.isCurrent() do
         if tabs.other.autoEgg then
-            eatEgg()
-            task.wait(0.5)
+            pcall(function()
+                local char = lp.player.Character
+                local bp = lp.player:FindFirstChild("Backpack")
+                local tool = (char and char:FindFirstChild("Protein Egg")) or (bp and bp:FindFirstChild("Protein Egg"))
+                if tool then
+                    for _ = 1, 5 do utils.remotes.MuscleEvent:FireServer("proteinEgg", tool) end
+                end
+            end)
+            task.wait(1)
         else
             task.wait(1)
         end
     end
-end)
-
-tabs.other:AddSwitch("Eat Eggs", function(state)
-    tabs.other.autoEgg = state
-    if state then eatEgg() end
-end)
-
-function eatShake()
-    tabs.other.character = lp.player.Character
-    tabs.other.backpack = lp.player:FindFirstChild("Backpack")
-    tabs.other.tool = (tabs.other.character and tabs.other.character:FindFirstChild("Tropical Shake")) or (tabs.other.backpack and tabs.other.backpack:FindFirstChild("Tropical Shake"))
-    if tabs.other.tool then
-        utils.remotes.MuscleEvent:FireServer("tropicalShake", tabs.other.tool)
-    end
-end
-
-task.spawn(function()
-    while true do
-        if tabs.other.autoShake then
-            eatShake()
-            task.wait(150)
-        else
-            task.wait(1)
-        end
-    end
-end)
-
-tabs.other:AddSwitch("Auto Shake (just to eat them)", function(state)
-    tabs.other.autoShake = state
-    if state then eatShake() end
 end)
 
 tabs.other:AddSwitch("Spin Fortune Wheel", function(bool)
     _G.AutoSpinWheel = bool
     if bool then
         task.spawn(function()
-            tabs.other.rspin = services.ReplicatedStorage.rEvents.openFortuneWheelRemote
-            tabs.other.chances = services.ReplicatedStorage.shared.catalogs.fortuneWheelChances["Fortune Wheel"]
-            while _G.AutoSpinWheel do
-                tabs.other.rspin:InvokeServer("openFortuneWheel", tabs.other.chances)
+            local rspin = services.ReplicatedStorage.rEvents.openFortuneWheelRemote
+            local chances = services.ReplicatedStorage.shared.catalogs.fortuneWheelChances["Fortune Wheel"]
+            while _G.AutoSpinWheel and utils.isCurrent() do
+                pcall(function() rspin:InvokeServer("openFortuneWheel", chances) end)
                 task.wait(1)
             end
         end)
     end
 end)
 
-tabs.other.eatAllBoostsRunning = false
-tabs.other.boostItemList = {"Tropical Shake", "Energy Shake", "Protein Bar", "TOUGH Bar", "Protein Shake", "ULTRA Shake", "Energy Bar"}
-tabs.other.boostActions = {
-    ["Tropical Shake"] = "tropicalShake", ["Energy Shake"] = "energyShake", ["Protein Bar"] = "proteinBar",
-    ["TOUGH Bar"] = "toughBar", ["Protein Shake"] = "proteinShake", ["ULTRA Shake"] = "ultraShake", ["Energy Bar"] = "energyBar",
-}
+tabs.other:AddSwitch("Hide Pets", function(state)
+    services.ReplicatedStorage.rEvents:WaitForChild("showPetsEvent"):FireServer(state and "hidePets" or "showPets")
+end):Set(true)
 
-task.spawn(function()
-    while true do
-        if tabs.other.eatAllBoostsRunning then
-            for _, boostItemName in ipairs(tabs.other.boostItemList) do
-                tabs.other.boostTool = (lp.player.Character and lp.player.Character:FindFirstChild(boostItemName))
-                    or (lp.player:FindFirstChild("Backpack") and lp.player.Backpack:FindFirstChild(boostItemName))
-                if tabs.other.boostTool then
-                    for _ = 1, 10 do utils.remotes.MuscleEvent:FireServer(tabs.other.boostActions[boostItemName], tabs.other.boostTool) end
-                end
-            end
-            task.wait(0.1)
-        else
-            task.wait(1)
-        end
-    end
-end)
+tabs.other:AddSwitch("Redact Name", function(state) privacyRedactor:SetNameEnabled(state) end):Set(true)
+tabs.other:AddSwitch("Redact Stats", function(state) privacyRedactor:SetStatsEnabled(state) end):Set(false)
 
-tabs.other:AddSwitch("Eat All Boosts (Expect Lag)", function(state) tabs.other.eatAllBoostsRunning = state end):Set(false)
-
-tabs.other.HidePetsSwitch = tabs.other:AddSwitch("Hide Pets", function(state)
-    tabs.other.hidePets = state
-    tabs.other.showPetsEvent:FireServer(state and "hidePets" or "showPets")
-end)
-tabs.other.HidePetsSwitch:Set(true)
-tabs.other.showPetsEvent:FireServer("hidePets")
-
-tabs.other.HidePopupsSwitch = tabs.other:AddSwitch("Hide Popups", function(state)
-    tabs.other.hidePopups = state
-    if not tabs.other.popupSwitchInitializing then
-        tabs.other.savePlayerSizeEvent:FireServer("showPopupsOption")
-    end
-end)
-tabs.other.HidePopupsSwitch:Set(true)
-tabs.other.popupSwitchInitializing = false
-
-tabs.other.RedactNameSwitch = tabs.other:AddSwitch("Redact Name", function(state)
-    privacyRedactor:SetNameEnabled(state)
-end)
-tabs.other.RedactNameSwitch:Set(true)
-privacyRedactor:SetNameEnabled(true)
-
-tabs.other.RedactStatsSwitch = tabs.other:AddSwitch("Redact Stats", function(state)
-    tabs.other.redactStats = state
-    privacyRedactor:SetStatsEnabled(state)
-    tabs.fullFarm.updateStats()
-end)
-tabs.other.RedactStatsSwitch:Set(false)
-privacyRedactor:SetStatsEnabled(false)
-
-tabs.other.tpE = function(position)
-    tabs.other.character = lp.player.Character or lp.player.CharacterAdded:Wait()
-    tabs.other.hrp = tabs.other.character:WaitForChild("HumanoidRootPart")
-    tabs.other.hrp.CFrame = CFrame.new(position)
-    tabs.other.hrp.AssemblyLinearVelocity = Vector3.zero
-    tabs.other.hrp.AssemblyAngularVelocity = Vector3.zero
-    task.wait(0.4)
-    services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-    task.wait(0.1)
-    services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+local function tpE(pos)
+    pcall(function()
+        local char = lp.player.Character or lp.player.CharacterAdded:Wait()
+        local hrp = char:WaitForChild("HumanoidRootPart")
+        hrp.CFrame = CFrame.new(pos)
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        task.wait(0.4)
+        services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        task.wait(0.1)
+        services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    end)
 end
 
-tabs.other:AddButton("Industrial Lift", function() tabs.other.tpE(Vector3.new(-5491.68945, 81.2379913, 4643.85791)) end)
-tabs.other:AddButton("Industrial Squat", function() tabs.other.tpE(Vector3.new(-5217.25049, 89.8445511, 5416.01025)) end)
-tabs.other:AddButton("Overcharged Lift", function() tabs.other.tpE(Vector3.new(-3023.363, 151.797, 4696.859)) end)
-tabs.other:AddButton("Overcharged Squat", function() tabs.other.tpE(Vector3.new(-2673.216, 151.797, 5494.047)) end)
+tabs.other:AddButton("Industrial Lift", function() tpE(Vector3.new(-5491.68945, 81.2379913, 4643.85791)) end)
+tabs.other:AddButton("Industrial Squat", function() tpE(Vector3.new(-5217.25049, 89.8445511, 5416.01025)) end)
+tabs.other:AddButton("Overcharged Lift", function() tpE(Vector3.new(-3023.363, 151.797, 4696.859)) end)
 
 tabs.other:AddButton("Anti Lag (for bad devices)", function()
-    for _, gui in pairs(lp.player:WaitForChild("PlayerGui"):GetChildren()) do
-        if gui:IsA("ScreenGui") then gui:Destroy() end
-    end
-    for _, v in pairs(services.Lighting:GetChildren()) do
-        if v:IsA("Sky") or v:IsA("Atmosphere") then v:Destroy() end
-    end
-    
-    local darkSky = Instance.new("Sky")
-    darkSky.Name = "DarkSky"
-    darkSky.SkyboxBk = "rbxassetid://0"; darkSky.SkyboxDn = "rbxassetid://0"; darkSky.SkyboxFt = "rbxassetid://0"
-    darkSky.SkyboxLf = "rbxassetid://0"; darkSky.SkyboxRt = "rbxassetid://0"; darkSky.SkyboxUp = "rbxassetid://0"
-    darkSky.Parent = services.Lighting
-
-    services.Lighting.Brightness = 0
-    services.Lighting.ClockTime = 0
-    services.Lighting.TimeOfDay = "00:00:00"
-    services.Lighting.OutdoorAmbient = Color3.new(0, 0, 0)
-    services.Lighting.Ambient = Color3.new(0, 0, 0)
-    services.Lighting.FogColor = Color3.new(0, 0, 0)
-    services.Lighting.FogEnd = 100
-    services.Lighting.GlobalShadows = false
-
-    workspace.Terrain.WaterColor = Color3.new(0, 0, 0)
-    workspace.Terrain.WaterReflectance = 0
-    workspace.Terrain.WaterTransparency = 1
-
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("ParticleEmitter") or obj:IsA("PointLight") or obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
-            obj:Destroy()
-        elseif obj:IsA("BasePart") then
-            obj.Color = Color3.new(0, 0, 0)
-            obj.Material = Enum.Material.SmoothPlastic
-            obj.Reflectance = 0
+    pcall(function()
+        for _, gui in pairs(lp.player:WaitForChild("PlayerGui"):GetChildren()) do
+            if gui:IsA("ScreenGui") then gui:Destroy() end
         end
-    end
-    pcall(function() services.ReplicatedStorage.shared.assets.ui.strengthFrame:Destroy() end)
-    pcall(function() services.ReplicatedStorage.shared.assets.ui.durabilityFrame:Destroy() end)
+        for _, v in pairs(services.Lighting:GetChildren()) do
+            if v:IsA("Sky") or v:IsA("Atmosphere") then v:Destroy() end
+        end
+        services.Lighting.Brightness = 0
+        services.Lighting.GlobalShadows = false
+        workspace.Terrain.WaterTransparency = 1
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("ParticleEmitter") or obj:IsA("PointLight") or obj:IsA("SpotLight") then
+                obj:Destroy()
+            elseif obj:IsA("BasePart") then
+                obj.Material = Enum.Material.SmoothPlastic
+                obj.Reflectance = 0
+            end
+        end
+    end)
 end)
 
 -- ==========================================
 -- INFO TAB
 -- ==========================================
 tabs.info:Show()
-tabs.info:AddLabel("Proyectados Hub - Farming")
-tabs.info:AddLabel("ProyectadosHub by Horarybrech")
-tabs.info.VersionLabel = tabs.info:AddLabel("Muscle Legends [Proyectados Edition]")
+tabs.info:AddLabel("Proyectados Hub - Farming & Boss Fusion")
+tabs.info.VersionLabel = tabs.info:AddLabel("Muscle Legends [Horarybrech Edition]")
 tabs.info.VersionLabel.TextSize = 20
 tabs.info.VersionLabel.Font = Enum.Font.Arcade
