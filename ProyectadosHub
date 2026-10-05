@@ -286,10 +286,10 @@ local function createPrivacyRedactor(player, key)
     return redactor
 end
 
--- Inicialización de Interfaz
+-- Inicialización de Interfaz (Color Morado / Purple)
 utils.library = loadstring(game:HttpGet("https://raw.githubusercontent.com/rodriguezberiticajuliocesar-wq/SilenceScripts/refs/heads/main/libraries/eleriumv2.luau?cache=" .. tostring(os.time()), true))()
 utils.ProyectadosHub = utils.library:AddWindow("Proyectados Hub | Farming & Boss - " .. utils.greeting(), {
-    main_color = Color3.fromRGB(0, 120, 255),
+    main_color = Color3.fromRGB(138, 43, 226),
     min_size = Vector2.new(700, 700),
     can_resize = true,
 })
@@ -315,13 +315,12 @@ utils.connect(utils.playerData.Player.CharacterAdded, function(character)
 end)
 
 local tabs = {
-    farming = utils.ProyectadosHub:AddTab("Farming (HW)"),
-    fast = utils.ProyectadosHub:AddTab("⚡ Fast (HW)"),
-    boss = utils.ProyectadosHub:AddTab("Boss (HW)"),
-    rebirths = utils.ProyectadosHub:AddTab("Rebirths (Silence)"),
-    strength = utils.ProyectadosHub:AddTab("Strength (Silence)"),
-    strength2 = utils.ProyectadosHub:AddTab("Strength Slower (Silence)"),
-    other = utils.ProyectadosHub:AddTab("Other (Silence)"),
+    farming = utils.ProyectadosHub:AddTab("Farming"),
+    fast = utils.ProyectadosHub:AddTab("⚡ Fast"),
+    boss = utils.ProyectadosHub:AddTab("Boss"),
+    strength = utils.ProyectadosHub:AddTab("Strength"),
+    strength2 = utils.ProyectadosHub:AddTab("Strength Slower"),
+    other = utils.ProyectadosHub:AddTab("Other"),
     info = utils.ProyectadosHub:AddTab("Info")
 }
 
@@ -1397,253 +1396,6 @@ tabs.boss.AutoFarmSwitch = tabs.boss:AddSwitch("Auto Farm Boss", function(state)
 end)
 
 -- ==========================================
--- SILENCE: REBIRTHS TAB
--- ==========================================
-local PETS = {
-    ["Omega Overlord"] = {repSpeed = 20, strength = 0, durability = 0, rebirth = 0},
-    ["Swift Samurai"] = {repSpeed = 15, strength = 0, durability = 0, rebirth = 0},
-    ["Powercore Hound"] = {repSpeed = 0, strength = 25, durability = 15, rebirth = 0},
-    ["Titanium Hydra"] = {repSpeed = 0, strength = 0, durability = 0, rebirth = 2},
-    ["Tribal Overlord"] = {repSpeed = 0, strength = 0, durability = 0, rebirth = 2},
-    ["Inferno Unicorn"] = {repSpeed = 0, strength = 25, durability = 25, rebirth = 0},
-    ["Common Boss Pet"] = {repSpeed = 5, strength = 0, durability = 0, rebirth = 0},
-    ["Rare Boss Pet"] = {repSpeed = 7, strength = 0, durability = 0, rebirth = 0},
-    ["Epic Boss Pet"] = {repSpeed = 10, strength = 0, durability = 0, rebirth = 0},
-    ["Rainbow Boss Pet"] = {repSpeed = 10, strength = 7, durability = 0, rebirth = 0},
-    ["Legendary Boss Pet"] = {repSpeed = 10, strength = 10, durability = 0, rebirth = 0},
-    ["Mythic Boss Pet"] = {repSpeed = 10, strength = 20, durability = 0, rebirth = 0},
-    ["Inferno Drake"] = {repSpeed = 40, strength = 0, durability = 0, rebirth = 0},
-}
-local MAX_PET_SLOTS = 12
-local TARGET_REP_SPEED = 100
-
-local function unequipConfiguredPets()
-    for _, folder in ipairs(lp.player.petsFolder:GetChildren()) do
-        if folder:IsA("Folder") then
-            for _, pet in ipairs(folder:GetChildren()) do
-                services.ReplicatedStorage.rEvents.equipPetEvent:FireServer("unequipPet", pet)
-            end
-        end
-    end
-    task.wait(0.1)
-end
-
-local function equipConfiguredPet(pet)
-    services.ReplicatedStorage.rEvents.equipPetEvent:FireServer("equipPet", pet)
-end
-
-local function getOwnedConfiguredPets()
-    local ownedPets = {}
-    for _, folder in ipairs(lp.player.petsFolder:GetChildren()) do
-        if folder:IsA("Folder") then
-            for _, pet in ipairs(folder:GetChildren()) do
-                local config = PETS[pet.Name]
-                if config then
-                    table.insert(ownedPets, {
-                        instance = pet, name = pet.Name,
-                        repSpeed = config.repSpeed or 0, strength = config.strength or 0,
-                        durability = config.durability or 0, rebirth = config.rebirth or 0,
-                    })
-                end
-            end
-        end
-    end
-    return ownedPets
-end
-
-local function equipBestFarmingPets()
-    unequipConfiguredPets()
-    local pets = getOwnedConfiguredPets()
-    local equipped = {}
-    local equippedCount = 0
-    local currentRepSpeed = 0
-    table.sort(pets, function(a, b) return a.repSpeed > b.repSpeed end)
-    for _, pet in ipairs(pets) do
-        if equippedCount >= MAX_PET_SLOTS or currentRepSpeed >= TARGET_REP_SPEED then break end
-        if pet.repSpeed > 0 then
-            equipConfiguredPet(pet.instance)
-            equipped[pet.instance] = true
-            equippedCount = equippedCount + 1
-            currentRepSpeed = currentRepSpeed + pet.repSpeed
-        end
-    end
-    local remainingPets = {}
-    for _, pet in ipairs(pets) do
-        if not equipped[pet.instance] then table.insert(remainingPets, pet) end
-    end
-    table.sort(remainingPets, function(a, b) return (a.strength + a.durability) > (b.strength + b.durability) end)
-    for _, pet in ipairs(remainingPets) do
-        if equippedCount >= MAX_PET_SLOTS then break end
-        if pet.strength > 0 or pet.durability > 0 then
-            equipConfiguredPet(pet.instance)
-            equipped[pet.instance] = true
-            equippedCount = equippedCount + 1
-        end
-    end
-    return currentRepSpeed, equippedCount
-end
-
-local function equipBestRebirthPets()
-    unequipConfiguredPets()
-    local pets = getOwnedConfiguredPets()
-    table.sort(pets, function(a, b) return a.rebirth > b.rebirth end)
-    local equippedCount = 0
-    local totalRebirthMultiplier = 0
-    for _, pet in ipairs(pets) do
-        if equippedCount >= MAX_PET_SLOTS then break end
-        if pet.rebirth > 0 then
-            equipConfiguredPet(pet.instance)
-            equippedCount = equippedCount + 1
-            totalRebirthMultiplier = totalRebirthMultiplier + pet.rebirth
-        end
-    end
-    return totalRebirthMultiplier, equippedCount
-end
-
-tabs.rebirths.leaderstats = lp.player:WaitForChild("leaderstats")
-tabs.rebirths.rebirths = tabs.rebirths.leaderstats:WaitForChild("Rebirths")
-tabs.rebirths.strength = tabs.rebirths.leaderstats:WaitForChild("Strength")
-tabs.rebirths.running = false
-tabs.rebirths.workerActive = false
-tabs.rebirths.startedAt = 0
-tabs.rebirths.timerStarted = false
-tabs.rebirths.hasStarted = false
-tabs.rebirths.totalElapsed = 0
-tabs.rebirths.startRebirths = tabs.rebirths.rebirths.Value
-tabs.rebirths.gainedBaselineSet = false
-tabs.rebirths.lastRebirthAt = tick()
-tabs.rebirths.lastRebirthValue = tabs.rebirths.rebirths.Value
-tabs.rebirths.paceBaselineReady = false
-
-tabs.rebirths.Status = tabs.rebirths:AddLabel("Status: Inactive")
-tabs.rebirths.Runtime = tabs.rebirths:AddLabel("Runtime: 0d 0h 0m 0s")
-tabs.rebirths.RebirthStats = tabs.rebirths:AddLabel("Rebirths: " .. formatCurrentStat(tabs.rebirths.rebirths.Value) .. " | Gained: 0")
-tabs.rebirths.Pace = tabs.rebirths:AddLabel("Pace: -- / Hour | -- / Day | -- / Week")
-tabs.rebirths.AveragePace = tabs.rebirths:AddLabel("Average: -- / Hour | -- / Day | -- / Week")
-tabs.rebirths.Status.TextColor3 = Color3.fromRGB(255, 80, 80)
-
-tabs.rebirths.updateStats = function()
-    tabs.rebirths.RebirthStats.Text = "Rebirths: " .. formatCurrentStat(tabs.rebirths.rebirths.Value)
-        .. " | Gained: " .. formatNumberSilence(tabs.rebirths.rebirths.Value - tabs.rebirths.startRebirths)
-end
-
-tabs.rebirths.updateRuntime = function()
-    tabs.rebirths.elapsed = tabs.rebirths.totalElapsed
-    if tabs.rebirths.running and tabs.rebirths.timerStarted then
-        tabs.rebirths.elapsed = tabs.rebirths.elapsed + tick() - tabs.rebirths.startedAt
-    end
-    tabs.rebirths.Runtime.Text = string.format(
-        "Runtime: %dd %dh %dm %ds",
-        math.floor(tabs.rebirths.elapsed / 86400), math.floor((tabs.rebirths.elapsed % 86400) / 3600),
-        math.floor((tabs.rebirths.elapsed % 3600) / 60), math.floor(tabs.rebirths.elapsed % 60)
-    )
-end
-
-tabs.rebirths.updatePace = function()
-    if not tabs.rebirths.running then return end
-    if not tabs.rebirths.paceBaselineReady then
-        tabs.rebirths.paceBaselineReady = true
-        tabs.rebirths.timerStarted = true
-        tabs.rebirths.startedAt = tick()
-        tabs.rebirths.lastRebirthAt = tick()
-        tabs.rebirths.lastRebirthValue = tabs.rebirths.rebirths.Value
-        tabs.rebirths.averageStartedAt = tick()
-        tabs.rebirths.averageStartRebirths = tabs.rebirths.rebirths.Value
-        return
-    end
-    if tabs.rebirths.rebirths.Value <= tabs.rebirths.lastRebirthValue then return end
-    tabs.rebirths.rebirthGain = tabs.rebirths.rebirths.Value - tabs.rebirths.lastRebirthValue
-    tabs.rebirths.secondsPerRebirth = (tick() - tabs.rebirths.lastRebirthAt) / tabs.rebirths.rebirthGain
-    tabs.rebirths.hourlyPace = 3600 / tabs.rebirths.secondsPerRebirth
-    tabs.rebirths.dailyPace = 86400 / tabs.rebirths.secondsPerRebirth
-    tabs.rebirths.weeklyPace = 604800 / tabs.rebirths.secondsPerRebirth
-    tabs.rebirths.Pace.Text = string.format("Pace: %s / Hour | %s / Day | %s / Week",
-        formatNumberSilence(tabs.rebirths.hourlyPace), formatNumberSilence(tabs.rebirths.dailyPace), formatNumberSilence(tabs.rebirths.weeklyPace))
-    tabs.rebirths.averageElapsed = tick() - tabs.rebirths.averageStartedAt
-    tabs.rebirths.averageHourlyPace = (tabs.rebirths.rebirths.Value - tabs.rebirths.averageStartRebirths) / tabs.rebirths.averageElapsed * 3600
-    tabs.rebirths.AveragePace.Text = string.format("Average: %s / Hour | %s / Day | %s / Week",
-        formatNumberSilence(tabs.rebirths.averageHourlyPace), formatNumberSilence(tabs.rebirths.averageHourlyPace * 24), formatNumberSilence(tabs.rebirths.averageHourlyPace * 168))
-    tabs.rebirths.lastRebirthAt = tick()
-    tabs.rebirths.lastRebirthValue = tabs.rebirths.rebirths.Value
-end
-
-tabs.rebirths.performRebirth = function()
-    tabs.rebirths.strengthTarget = 5000 + tabs.rebirths.rebirths.Value * 2550
-    tabs.rebirths.repsPerBurst = lp.player.MembershipType == Enum.MembershipType.Premium and 6 or 12
-    while tabs.rebirths.running and tabs.rebirths.strength.Value < tabs.rebirths.strengthTarget do
-        tabs.rebirths.repIndex = 1
-        while tabs.rebirths.repIndex <= tabs.rebirths.repsPerBurst do
-            utils.remotes.MuscleEvent:FireServer("rep")
-            tabs.rebirths.repIndex = tabs.rebirths.repIndex + 1
-        end
-        task.wait(0.02)
-    end
-    if tabs.rebirths.running and tabs.rebirths.strength.Value >= tabs.rebirths.strengthTarget then
-        equipBestRebirthPets()
-        task.wait(0.25)
-        tabs.rebirths.rebirthValueBefore = tabs.rebirths.rebirths.Value
-        repeat
-            services.ReplicatedStorage.rEvents.rebirthRemote:InvokeServer("rebirthRequest")
-            task.wait(0.05)
-        until tabs.rebirths.rebirths.Value > tabs.rebirths.rebirthValueBefore or not tabs.rebirths.running
-    end
-end
-
-tabs.rebirths.startWorker = function()
-    if tabs.rebirths.workerActive then return end
-    tabs.rebirths.workerActive = true
-    task.spawn(function()
-        while tabs.rebirths.running do
-            equipBestFarmingPets()
-            tabs.rebirths.performRebirth()
-            task.wait(0.5)
-        end
-        tabs.rebirths.workerActive = false
-    end)
-end
-
-tabs.rebirths.rebirths:GetPropertyChangedSignal("Value"):Connect(function()
-    tabs.rebirths.updatePace()
-    tabs.rebirths.updateStats()
-end)
-
-tabs.rebirths:AddSwitch("Pack Rebirth (Yes, Robux Packs)", function(state)
-    tabs.rebirths.running = state
-    if state then
-        tabs.rebirths.hasStarted = true
-        tabs.rebirths.startedAt = 0
-        tabs.rebirths.timerStarted = false
-        if not tabs.rebirths.gainedBaselineSet then
-            tabs.rebirths.startRebirths = tabs.rebirths.rebirths.Value
-            tabs.rebirths.gainedBaselineSet = true
-        end
-        tabs.rebirths.lastRebirthAt = tick()
-        tabs.rebirths.lastRebirthValue = tabs.rebirths.rebirths.Value
-        tabs.rebirths.paceBaselineReady = false
-        tabs.rebirths.Status.Text = "Status: Rebirthing"
-        tabs.rebirths.Status.TextColor3 = Color3.fromRGB(80, 255, 120)
-        tabs.rebirths.updateStats()
-        tabs.rebirths.startWorker()
-    else
-        if tabs.rebirths.timerStarted and tabs.rebirths.startedAt > 0 then
-            tabs.rebirths.totalElapsed = tabs.rebirths.totalElapsed + tick() - tabs.rebirths.startedAt
-            tabs.rebirths.startedAt = 0
-            tabs.rebirths.timerStarted = false
-        end
-        tabs.rebirths.Status.Text = tabs.rebirths.hasStarted and "Status: Paused" or "Status: Inactive"
-        tabs.rebirths.Status.TextColor3 = tabs.rebirths.hasStarted and Color3.fromRGB(255, 180, 70) or Color3.fromRGB(255, 80, 80)
-        tabs.rebirths.updateRuntime()
-    end
-end):Set(false)
-
-task.spawn(function()
-    while true do
-        tabs.rebirths.updateRuntime()
-        task.wait(1)
-    end
-end)
-
--- ==========================================
 -- SILENCE: STRENGTH TAB
 -- ==========================================
 tabs.strength.leaderstats = lp.player:WaitForChild("leaderstats")
@@ -2165,7 +1917,6 @@ end)
 tabs.other.RedactStatsSwitch = tabs.other:AddSwitch("Redact Stats", function(state)
     tabs.other.redactStats = state
     privacyRedactor:SetStatsEnabled(state)
-    tabs.rebirths.updateStats()
     tabs.strength.updateStats()
     tabs.strength2.updateStats()
 end)
@@ -2216,7 +1967,7 @@ tabs.other:AddButton("Anti Lag (for bad devices)", function()
     workspace.Terrain.WaterTransparency = 1
 
     for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("ParticleEmitter") or obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
+        if obj:IsA("ParticleEmitter") or obj:IsA("PointLight") or obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
             obj:Destroy()
         elseif obj:IsA("BasePart") then
             obj.Color = Color3.new(0, 0, 0)
@@ -2237,8 +1988,8 @@ tabs.info:Show()
 tabs.info:AddLabel("Proyectados Hub - Farming & Boss Fusion")
 tabs.info:AddLabel("Optimizado estrictamente para Farmeo y Jefes.")
 tabs.info:AddLabel("Créditos originales:")
-tabs.info:AddLabel("- cyanam1 (@𝔥𝔬𝔫𝔢𝔶) & White @chilin6369 (HonenxWhite)")
-tabs.info:AddLabel("- Henrik @xyzhenrik & Muki @mukimagdich (Silence)")
+tabs.info:AddLabel("- cyanam1 & White (HonenxWhite)")
+tabs.info:AddLabel("- Henrik & Muki (Silence)")
 tabs.info.VersionLabel = tabs.info:AddLabel("Muscle Legends [Proyectados Edition]")
 tabs.info.VersionLabel.TextSize = 20
 tabs.info.VersionLabel.Font = Enum.Font.Arcade
