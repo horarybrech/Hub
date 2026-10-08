@@ -178,7 +178,7 @@ toggle.Position = UDim2.new(0, 5, 0, -2)
 toggle.Rotation = 0
 toggle.Size = UDim2.new(0, 20, 0, 20)
 toggle.ZIndex = 2
-toggle.Image = "https://www.roblox.com/Thumbs/Asset.ashx?width=420&height=420&assetId=136171704230647"
+toggle.Image = "" -- [IMAGEN ELIMINADA]
 
 local toggleCorner = Instance.new("UICorner")
 toggleCorner.CornerRadius = UDim.new(0.5, 0)
@@ -854,7 +854,7 @@ local toggleGuiBtn = Instance.new("TextButton")
 toggleGuiBtn.Name = "ToggleGuiButton"
 toggleGuiBtn.Parent = imgui
 toggleGuiBtn.Size = UDim2.new(0, 40, 0, 40)
-toggleGuiBtn.Position = UDim2.new(0, 15, 0.5, -20)
+toggleGuiBtn.Position = UDim2.new(0, 15, 0, 50) -- [MOVIDO] Esquina superior izquierda
 toggleGuiBtn.BackgroundColor3 = ui_options.main_color
 toggleGuiBtn.BorderSizePixel = 0
 toggleGuiBtn.Text = "👁"
@@ -908,7 +908,6 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
 					if not isVisible then
 						toggleBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
 					else
-						-- Se volverá a asignar su color en el bucle principal de AddWindow
 						toggleBtn.BackgroundColor3 = ui_options.main_color 
 					end
 				end
@@ -1158,7 +1157,6 @@ function library:AddWindow(title, options)
 				Top.ImageColor3 = options.main_color
 				SplitFrame.BackgroundColor3 = options.main_color
 
-				-- Actualiza el color del botón flotante para que coincida con tu tema
 				if imgui and imgui:FindFirstChild("ToggleGuiButton") and windowsFrame.Visible then
 					imgui.ToggleGuiButton.BackgroundColor3 = options.main_color
 				end
