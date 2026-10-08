@@ -26,7 +26,7 @@ function ModernLib:AddWindow(titleText, options)
     toggleBtn.Size = UDim2.new(0, 45, 0, 45)
     toggleBtn.Position = UDim2.new(0, 20, 0.5, -22)
     toggleBtn.BackgroundColor3 = mainColor
-    toggleBtn.Text = "👁"
+    toggleBtn.Text = "Proyectarse"
     toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     toggleBtn.TextSize = 24
     toggleBtn.Parent = screenGui
