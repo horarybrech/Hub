@@ -58,7 +58,7 @@ local tabSelection = Instance.new("ImageLabel")
 local tabButtons = Instance.new("Frame")
 local uiListLayout = Instance.new("UIListLayout")
 local frame = Instance.new("Frame")
-local tab = Instance.new("Frame")
+local tab = Instance.new("ScrollingFrame") -- [SOLUCIÓN 1] Cambiado a ScrollingFrame
 local uiListLayout2 = Instance.new("UIListLayout")
 local textBox = Instance.new("TextBox")
 local textBoxRoundify4px = Instance.new("ImageLabel")
@@ -178,7 +178,7 @@ toggle.Position = UDim2.new(0, 5, 0, -2)
 toggle.Rotation = 0
 toggle.Size = UDim2.new(0, 20, 0, 20)
 toggle.ZIndex = 2
-toggle.Image = "" -- [IMAGEN ELIMINADA]
+toggle.Image = "" -- Imagen transparente
 
 local toggleCorner = Instance.new("UICorner")
 toggleCorner.CornerRadius = UDim.new(0.5, 0)
@@ -255,11 +255,16 @@ frame.BorderSizePixel = 0
 frame.Position = UDim2.new(0, 0, 1, 0)
 frame.Size = UDim2.new(1, 0, 0, 2)
 
+-- [SOLUCIÓN 1] Configuración del Scroll para las pestañas
 tab.Name = "Tab"
 tab.Parent = prefabs
 tab.BackgroundColor3 = Color3.new(1, 1, 1)
 tab.BackgroundTransparency = 1
+tab.BorderSizePixel = 0
 tab.Size = UDim2.new(1, 0, 1, 0)
+tab.CanvasSize = UDim2.new(0, 0, 0, 0)
+tab.AutomaticCanvasSize = Enum.AutomaticSize.Y
+tab.ScrollBarThickness = 2
 tab.Visible = false
 
 uiListLayout2.Parent = tab
@@ -848,13 +853,13 @@ windowsFrame.Position = UDim2.new(0, 20, 0, 20)
 windowsFrame.Size = UDim2.new(1, 20, 1, -20)
 
 -- ==========================================
--- [NUEVO] Botón Flotante para Ocultar/Mostrar la GUI
+-- Botón Flotante para Ocultar/Mostrar la GUI
 -- ==========================================
 local toggleGuiBtn = Instance.new("TextButton")
 toggleGuiBtn.Name = "ToggleGuiButton"
 toggleGuiBtn.Parent = imgui
 toggleGuiBtn.Size = UDim2.new(0, 40, 0, 40)
-toggleGuiBtn.Position = UDim2.new(0, 15, 0, 50) -- [MOVIDO] Esquina superior izquierda
+toggleGuiBtn.Position = UDim2.new(0, 15, 0, 50) 
 toggleGuiBtn.BackgroundColor3 = ui_options.main_color
 toggleGuiBtn.BorderSizePixel = 0
 toggleGuiBtn.Text = "👁"
@@ -1170,7 +1175,48 @@ function library:AddWindow(title, options)
 	local Resizer = Window:WaitForChild("Resizer")
 
 	local window_data = {}
-	Window.Draggable = true
+	Window.Draggable = false -- [SOLUCIÓN 2] Desactiva el drag por defecto
+
+    -- [SOLUCIÓN 2] Lógica Custom Drag (Arrastre solo desde el título)
+	local dragging
+	local dragInput
+	local dragStart
+	local startPos
+
+	local function updateDrag(input)
+		local delta = input.Position - dragStart
+		Window.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+
+	Window.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			-- Verifica si el ratón está en los 35 píxeles superiores (la barra de título)
+			local relativeY = input.Position.Y - Window.AbsolutePosition.Y
+			if relativeY <= 35 then
+				dragging = true
+				dragStart = input.Position
+				startPos = Window.Position
+
+				input.Changed:Connect(function()
+					if input.UserInputState == Enum.UserInputState.End then
+						dragging = false
+					end
+				end)
+			end
+		end
+	end)
+
+	Window.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+
+	UIS.InputChanged:Connect(function(input)
+		if input == dragInput and dragging then
+			updateDrag(input)
+		end
+	end)
 
 	function window_data:SetTitle(new_title)
 		Window:FindFirstChild("Title").Text = tostring(new_title or "New Window")
@@ -1180,7 +1226,6 @@ function library:AddWindow(title, options)
 		local oldIcon = mouse.Icon
 		local Entered = false
 		Resizer.MouseEnter:Connect(function()
-			Window.Draggable = false
 			if options.can_resize then
 				oldIcon = mouse.Icon
 			end
@@ -1192,7 +1237,6 @@ function library:AddWindow(title, options)
 			if options.can_resize then
 				mouse.Icon = oldIcon
 			end
-			Window.Draggable = true
 		end)
 
 		local Held = false
@@ -1472,11 +1516,9 @@ function library:AddWindow(title, options)
 							local Entered = false
 							slider.MouseEnter:Connect(function()
 								Entered = true
-								Window.Draggable = false
 							end)
 							slider.MouseLeave:Connect(function()
 								Entered = false
-								Window.Draggable = true
 							end)
 
 							local Held = false
@@ -1829,19 +1871,15 @@ function library:AddWindow(title, options)
 
 							local Entered1, Entered2 = false, false
 							palette.MouseEnter:Connect(function()
-								Window.Draggable = false
 								Entered1 = true
 							end)
 							palette.MouseLeave:Connect(function()
-								Window.Draggable = true
 								Entered1 = false
 							end)
 							saturation.MouseEnter:Connect(function()
-								Window.Draggable = false
 								Entered2 = true
 							end)
 							saturation.MouseLeave:Connect(function()
-								Window.Draggable = true
 								Entered2 = false
 							end)
 
