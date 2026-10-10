@@ -1,0 +1,1466 @@
+-- =====================================================
+-- SLK VORTEX PRIVATE v17.0 - PARTE 1 de 4
+-- =====================================================
+
+local WHITELIST_URL = "https://pastebin.com/raw/H0bWWcq8"
+local FAIL_SAFE = true
+
+local function loadWhitelist()
+    local success, result = pcall(function()
+        return game:HttpGet(WHITELIST_URL .. "?t=" .. tostring(os.time()), true)
+    end)
+    if not success or not result or #result < 3 then return nil end
+    result = result:gsub("\r", "")
+    local ids = {}
+    for idStr in result:gmatch("%d+") do
+        local idNum = tonumber(idStr)
+        if idNum and idNum > 0 then table.insert(ids, idNum) end
+    end
+    if #ids == 0 then return nil end
+    return ids
+end
+
+local whitelist = loadWhitelist()
+if not whitelist then
+    if not FAIL_SAFE then
+        game:GetService("Players").LocalPlayer:Kick("[SLK VORTEX PRIVATE] Whitelist inaccesible.")
+        return
+    end
+    warn("[SLK VORTEX PRIVATE] Whitelist inaccesible. Fail-safe activo.")
+else
+    local userId = game:GetService("Players").LocalPlayer.UserId
+    local authorized = false
+    for _, id in ipairs(whitelist) do
+        if id == userId then authorized = true break end
+    end
+    if not authorized then
+        game:GetService("Players").LocalPlayer:Kick("[SLK VORTEX PRIVATE] No autorizado.\nUserID: " .. userId)
+        return
+    end
+    print("[SLK VORTEX PRIVATE] ✅ Autorizado")
+end
+
+local services = {
+    Players = game:GetService("Players"),
+    ReplicatedStorage = game:GetService("ReplicatedStorage"),
+    VirtualUser = game:GetService("VirtualUser"),
+    VirtualInputManager = game:GetService("VirtualInputManager"),
+    Workspace = workspace,
+    Lighting = game:GetService("Lighting"),
+    UserInputService = game:GetService("UserInputService"),
+    RunService = game:GetService("RunService"),
+    CollectionService = game:GetService("CollectionService"),
+    HttpService = game:GetService("HttpService"),
+    Stats = game:GetService("Stats")
+}
+
+local utils = {}
+utils.runtime = {}
+
+utils.playerData = {
+    Player = services.Players.LocalPlayer,
+    DisplayName = services.Players.LocalPlayer.DisplayName,
+    Character = services.Players.LocalPlayer.Character,
+    Humanoid = nil,
+    Camera = services.Workspace.CurrentCamera,
+    Backpack = services.Players.LocalPlayer:WaitForChild("Backpack")
+}
+utils.playerData.Humanoid = utils.playerData.Character and utils.playerData.Character:FindFirstChildOfClass("Humanoid")
+
+function utils.getMuscleEvent()
+    local player = services.Players.LocalPlayer
+    local event = player:FindFirstChild("muscleEvent")
+    if not event then
+        local tries = 0
+        repeat
+            task.wait(0.1)
+            event = player:FindFirstChild("muscleEvent")
+            tries = tries + 1
+        until event or tries > 100
+    end
+    return event
+end
+
+utils.remotes = {}
+utils.remotes.MuscleEvent = utils.getMuscleEvent()
+
+function utils.getRemote(parent, name)
+    if not parent then return nil end
+    local remote = parent:FindFirstChild(name)
+    if not remote then
+        local tries = 0
+        repeat
+            task.wait(0.1)
+            remote = parent:FindFirstChild(name)
+            tries = tries + 1
+        until remote or tries > 50
+    end
+    return remote
+end
+
+local rEvents = services.ReplicatedStorage:WaitForChild("rEvents", 30)
+utils.remotes.ChangeSpeedSize = rEvents and utils.getRemote(rEvents, "changeSpeedSizeRemote")
+utils.remotes.RebirthRemote = rEvents and utils.getRemote(rEvents, "rebirthRemote")
+utils.remotes.EquipPetEvent = rEvents and utils.getRemote(rEvents, "equipPetEvent")
+utils.remotes.PetEvolveEvent = rEvents and utils.getRemote(rEvents, "petEvolveEvent")
+utils.remotes.ShowPetsEvent = rEvents and utils.getRemote(rEvents, "showPetsEvent")
+utils.remotes.OpenFortuneWheelRemote = rEvents and utils.getRemote(rEvents, "openFortuneWheelRemote")
+utils.remotes.PetShopRemote = rEvents and utils.getRemote(rEvents, "cPetShopRemote")
+
+local leaderstats = services.Players.LocalPlayer:WaitForChild("leaderstats", 30)
+utils.playerData.Strength = leaderstats and leaderstats:WaitForChild("Strength", 15)
+utils.playerData.Rebirths = leaderstats and leaderstats:WaitForChild("Rebirths", 15)
+utils.playerData.Durability = services.Players.LocalPlayer:WaitForChild("Durability", 15)
+
+function utils.formatNumber(n)
+    if not n or n ~= n then return "0" end
+    local absN = math.abs(n)
+    local sign = n < 0 and "-" or ""
+    if absN >= 1e18 then return sign .. string.format("%.1fqi", absN / 1e18)
+    elseif absN >= 1e15 then return sign .. string.format("%.1fqa", absN / 1e15)
+    elseif absN >= 1e12 then return sign .. string.format("%.1ft", absN / 1e12)
+    elseif absN >= 1e9 then return sign .. string.format("%.1fb", absN / 1e9)
+    elseif absN >= 1e6 then return sign .. string.format("%.1fm", absN / 1e6)
+    elseif absN >= 1e3 then return sign .. string.format("%.1fk", absN / 1e3)
+    else return sign .. tostring(math.floor(absN)) end
+end
+
+function utils.formatWithCommas(n)
+    n = math.floor(n or 0)
+    local formatted = tostring(n)
+    while true do
+        local k
+        formatted, k = formatted:gsub("^(-?%d+)(%d%d%d)", "%1.%2")
+        if k == 0 then break end
+    end
+    return formatted
+end
+
+function utils.connect(signal, callback)
+    return signal:Connect(callback)
+end
+
+function utils.equipTrainingTool()
+    local char = services.Players.LocalPlayer.Character
+    if not char then return nil end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local backpack = services.Players.LocalPlayer:FindFirstChild("Backpack")
+    if not hum or not backpack then return nil end
+    for _, toolName in ipairs({"Weight", "Pushups", "Situps", "Handstands"}) do
+        if char:FindFirstChild(toolName) then return toolName end
+    end
+    for _, toolName in ipairs({"Weight", "Pushups", "Situps", "Handstands"}) do
+        local tool = backpack:FindFirstChild(toolName)
+        if tool then
+            pcall(function() hum:EquipTool(tool) end)
+            task.wait(0.2)
+            return toolName
+        end
+    end
+    return nil
+end
+
+local privacyRedactor = {}
+privacyRedactor.NameEnabled = false
+privacyRedactor.StatsEnabled = false
+privacyRedactor.OriginalTexts = {}
+privacyRedactor.NameGuis = {}
+privacyRedactor.PlayerName = services.Players.LocalPlayer.Name
+privacyRedactor.PlayerDisplayName = services.Players.LocalPlayer.DisplayName
+
+function privacyRedactor:containsName(text)
+    if not text then return false end
+    return string.find(text, self.PlayerName, 1, true) or string.find(text, self.PlayerDisplayName, 1, true)
+end
+
+function privacyRedactor:redactText(object, replacement)
+    if not object or (not object:IsA("TextLabel") and not object:IsA("TextButton")) then return end
+    if not self.OriginalTexts[object] then self.OriginalTexts[object] = object.Text end
+    if object.Text ~= replacement then object.Text = replacement end
+end
+
+function privacyRedactor:hideNameGui(character)
+    if not character then return end
+    for _, descendant in pairs(character:GetDescendants()) do
+        if descendant.Name == "nameGui" and descendant:IsA("BillboardGui") then
+            if self.NameGuis[descendant] == nil then self.NameGuis[descendant] = descendant.Enabled end
+            descendant.Enabled = false
+        end
+    end
+end
+
+function privacyRedactor:restoreNameGui()
+    for gui, originalState in pairs(self.NameGuis) do
+        if gui and gui.Parent then gui.Enabled = originalState ~= false end
+    end
+    self.NameGuis = {}
+end
+
+function privacyRedactor:isTopStat(object)
+    if not object.Text or not string.find(object.Text, "%d") then return false end
+    if object.AbsolutePosition.Y > 200 then return false end
+    local current = object
+    for _ = 1, 6 do
+        if not current then break end
+        local name = string.lower(current.Name)
+        if string.find(name, "strength", 1, true)
+            or string.find(name, "gem", 1, true)
+            or string.find(name, "rebirth", 1, true)
+            or string.find(name, "durability", 1, true)
+            or string.find(name, "agility", 1, true)
+            or string.find(name, "kills", 1, true) then
+            return true
+        end
+        current = current.Parent
+    end
+    return false
+end
+
+function privacyRedactor:redactLeaderboardStats(nameObject, coreGui)
+    local nameCenterY = nameObject.AbsolutePosition.Y + nameObject.AbsoluteSize.Y / 2
+    local minimumX = nameObject.AbsolutePosition.X + nameObject.AbsoluteSize.X * 0.5
+    local tolerance = math.max(6, nameObject.AbsoluteSize.Y * 0.5)
+    for _, valueObject in pairs(coreGui:GetDescendants()) do
+        if (valueObject:IsA("TextLabel") or valueObject:IsA("TextButton"))
+            and valueObject ~= nameObject and string.find(valueObject.Text, "%d") then
+            local valueCenterY = valueObject.AbsolutePosition.Y + valueObject.AbsoluteSize.Y / 2
+            if valueObject.AbsolutePosition.X >= minimumX and math.abs(valueCenterY - nameCenterY) <= tolerance then
+                self:redactText(valueObject, "####")
+            end
+        end
+    end
+end
+
+function privacyRedactor:update()
+    local coreGui = game:GetService("CoreGui")
+    local player = services.Players.LocalPlayer
+    local character = player.Character
+    if self.NameEnabled and character then self:hideNameGui(character) end
+    for _, object in pairs(coreGui:GetDescendants()) do
+        if object:IsA("TextLabel") or object:IsA("TextButton") then
+            if self:containsName(object.Text) then
+                if self.StatsEnabled then self:redactLeaderboardStats(object, coreGui) end
+                if self.NameEnabled then self:redactText(object, "########") end
+            end
+        end
+    end
+    if self.StatsEnabled then
+        for _, object in pairs(player:WaitForChild("PlayerGui"):GetDescendants()) do
+            if (object:IsA("TextLabel") or object:IsA("TextButton")) and self:isTopStat(object) then
+                self:redactText(object, "####")
+            end
+        end
+    end
+end
+
+function privacyRedactor:restore()
+    for object, originalText in pairs(self.OriginalTexts) do
+        if object and object.Parent then
+            pcall(function() object.Text = originalText end)
+        end
+    end
+    self.OriginalTexts = {}
+    self:restoreNameGui()
+end
+
+function privacyRedactor:setNameEnabled(state)
+    self.NameEnabled = state
+    if not state then
+        for object, originalText in pairs(self.OriginalTexts) do
+            if object and object.Parent and self:containsName(originalText) then
+                pcall(function() object.Text = originalText end)
+                self.OriginalTexts[object] = nil
+            end
+        end
+        self:restoreNameGui()
+    end
+end
+
+function privacyRedactor:setStatsEnabled(state)
+    self.StatsEnabled = state
+    if not state then
+        for object, originalText in pairs(self.OriginalTexts) do
+            if object and object.Parent and not self:containsName(originalText) then
+                pcall(function() object.Text = originalText end)
+                self.OriginalTexts[object] = nil
+            end
+        end
+    end
+end
+
+task.spawn(function()
+    while true do
+        if privacyRedactor.NameEnabled or privacyRedactor.StatsEnabled then
+            pcall(function() privacyRedactor:update() end)
+        end
+        task.wait(1)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if privacyRedactor.NameEnabled then
+            local char = services.Players.LocalPlayer.Character
+            if char then pcall(function() privacyRedactor:hideNameGui(char) end) end
+        end
+        task.wait(0.2)
+    end
+end)
+-- =====================================================
+-- SLK VORTEX PRIVATE v17.0 - PARTE 2 de 4
+-- =====================================================
+
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+if not Fluent then
+    game.StarterGui:SetCore("SendNotification", {
+        Title = "SLK VORTEX PRIVATE",
+        Text = "❌ Error al cargar Fluent UI.",
+        Duration = 5
+    })
+    return
+end
+
+local SLK_IMAGE = "rbxassetid://9180622670"
+
+local Window = Fluent:CreateWindow({
+    Title = "SLK VORTEX PRIVATE",
+    SubTitle = "by SLK Team",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = false,
+    Theme = "Dark",
+    MinimizeKey = nil
+})
+
+-- BOTÓN FLOTANTE
+local FloatingButton = Instance.new("ScreenGui")
+FloatingButton.Name = "SLK_FloatingButton"
+FloatingButton.ResetOnSpawn = false
+FloatingButton.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+FloatingButton.Parent = game:GetService("CoreGui")
+
+local Button = Instance.new("TextButton")
+Button.Name = "ToggleButton"
+Button.Size = UDim2.new(0, 60, 0, 60)
+Button.Position = UDim2.new(0, 20, 0, 100)
+Button.BackgroundColor3 = Color3.fromRGB(120, 0, 255)
+Button.BorderSizePixel = 0
+Button.Text = "SLK"
+Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+Button.TextScaled = true
+Button.Font = Enum.Font.GothamBold
+Button.AutoButtonColor = false
+Button.Parent = FloatingButton
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(1, 0)
+UICorner.Parent = Button
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(255, 255, 255)
+UIStroke.Thickness = 2
+UIStroke.Parent = Button
+
+local dragging = false
+local dragInput, dragStart, startPos
+
+Button.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = Button.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+
+Button.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+services.UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        Button.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+local UIHidden = false
+local function findFluentGui()
+    local guis = {}
+    for _, gui in ipairs(game:GetService("CoreGui"):GetChildren()) do
+        if gui:IsA("ScreenGui") and gui.Name:lower():find("fluent") then table.insert(guis, gui) end
+    end
+    local pg = services.Players.LocalPlayer:FindFirstChild("PlayerGui")
+    if pg then
+        for _, gui in ipairs(pg:GetChildren()) do
+            if gui:IsA("ScreenGui") and gui.Name:lower():find("fluent") then table.insert(guis, gui) end
+        end
+    end
+    return guis
+end
+
+Button.MouseButton1Click:Connect(function()
+    UIHidden = not UIHidden
+    for _, gui in ipairs(findFluentGui()) do
+        if gui and gui.Parent then gui.Enabled = not UIHidden end
+    end
+    Button.Text = UIHidden and "👁" or "SLK"
+end)
+
+services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        UIHidden = not UIHidden
+        for _, gui in ipairs(findFluentGui()) do
+            if gui and gui.Parent then gui.Enabled = not UIHidden end
+        end
+        Button.Text = UIHidden and "👁" or "SLK"
+    end
+end)
+
+-- PESTAÑAS
+local Tabs = {
+    Main = Window:AddTab({ Title = "🏠 Main", Icon = "" }),
+    Farm = Window:AddTab({ Title = "💪 Farming", Icon = "" }),
+    Fast = Window:AddTab({ Title = "⚡ Fast", Icon = "" }),
+    Pets = Window:AddTab({ Title = "🐾 Pets", Icon = "" }),
+    Kill = Window:AddTab({ Title = "💀 Killing", Icon = "" }),
+    Stats = Window:AddTab({ Title = "📊 Stats", Icon = "" }),
+    Info = Window:AddTab({ Title = "ℹ️ Info", Icon = "" })
+}
+
+-- TAB MAIN
+Tabs.Main:AddParagraph({ Title = "⚙️ User Settings", Content = "Configura tu personaje" })
+
+Tabs.Main:AddInput("SizeInput", {
+    Title = "Size",
+    Description = "Tamaño del personaje",
+    Default = "2",
+    Placeholder = "2",
+    Numeric = true,
+    Finished = false,
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num and num > 0 then _G.SLKSize = num end
+    end
+})
+
+Tabs.Main:AddToggle("SizeToggle", {
+    Title = "Set Size",
+    Description = "Aplica el tamaño configurado",
+    Default = false,
+    Callback = function(state) _G.SLKSizeEnabled = state end
+})
+
+task.spawn(function()
+    while true do
+        if _G.SLKSizeEnabled and utils.playerData.Character and utils.remotes.ChangeSpeedSize then
+            pcall(function() utils.remotes.ChangeSpeedSize:InvokeServer("changeSize", _G.SLKSize or 2) end)
+        end
+        task.wait(0.5)
+    end
+end)
+
+Tabs.Main:AddInput("SpeedInput", {
+    Title = "Speed",
+    Description = "Velocidad del personaje",
+    Default = "120",
+    Placeholder = "120",
+    Numeric = true,
+    Finished = false,
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num and num > 0 then _G.SLKSpeed = num end
+    end
+})
+
+Tabs.Main:AddToggle("SpeedToggle", {
+    Title = "Set Speed",
+    Description = "Aplica la velocidad configurada",
+    Default = false,
+    Callback = function(state) _G.SLKSpeedEnabled = state end
+})
+
+task.spawn(function()
+    while true do
+        if _G.SLKSpeedEnabled and utils.playerData.Character and utils.remotes.ChangeSpeedSize then
+            pcall(function() utils.remotes.ChangeSpeedSize:InvokeServer("changeSpeed", _G.SLKSpeed or 120) end)
+        end
+        task.wait(0.5)
+    end
+end)
+
+Tabs.Main:AddInput("FOVInput", {
+    Title = "FOV (1-120)",
+    Description = "Campo de visión",
+    Default = "70",
+    Placeholder = "70",
+    Numeric = true,
+    Finished = false,
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num and num >= 1 and num <= 120 then _G.SLKFOV = num end
+    end
+})
+
+Tabs.Main:AddToggle("FOVToggle", {
+    Title = "Set FOV",
+    Description = "Aplica el FOV configurado",
+    Default = false,
+    Callback = function(state)
+        _G.SLKFOVEnabled = state
+        if utils.playerData.Camera then
+            utils.playerData.Camera.FieldOfView = state and (_G.SLKFOV or 70) or 70
+        end
+    end
+})
+
+Tabs.Main:AddSection("🛡️ Protection")
+
+Tabs.Main:AddToggle("AntiFlingToggle", {
+    Title = "Anti Fling",
+    Description = "Solo frena si te están flingueando",
+    Default = false,
+    Callback = function(state)
+        _G.SLKAntiFling = state
+        local char = services.Players.LocalPlayer.Character
+        if char then
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if root then
+                local bv = root:FindFirstChild("SLK_AntiFling")
+                if bv then bv:Destroy() end
+            end
+        end
+    end
+})
+
+task.spawn(function()
+    while true do
+        if _G.SLKAntiFling then
+            local char = services.Players.LocalPlayer.Character
+            if char then
+                local root = char:FindFirstChild("HumanoidRootPart")
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if root and hum and hum.Health > 0 then
+                    local vel = root.AssemblyLinearVelocity
+                    local speed2D = Vector3.new(vel.X, 0, vel.Z).Magnitude
+                    local angVel = root.AssemblyAngularVelocity.Magnitude
+                    if speed2D > 150 or angVel > 50 or vel.Y > 200 then
+                        root.AssemblyLinearVelocity = Vector3.new(vel.X * 0.05, math.min(vel.Y, 30), vel.Z * 0.05)
+                        root.AssemblyAngularVelocity = Vector3.zero
+                    end
+                end
+            end
+        end
+        task.wait(0.1)
+    end
+end)
+
+Tabs.Main:AddSection("🕵️ Privacy")
+
+Tabs.Main:AddToggle("HideNameToggle", {
+    Title = "Hide Name",
+    Description = "Oculta tu nombre en el leaderboard",
+    Default = false,
+    Callback = function(state) privacyRedactor:setNameEnabled(state) end
+})
+
+Tabs.Main:AddToggle("HideStatsToggle", {
+    Title = "Hide Stats",
+    Description = "Oculta tus stats",
+    Default = false,
+    Callback = function(state) privacyRedactor:setStatsEnabled(state) end
+})
+
+Tabs.Main:AddButton({
+    Title = "Restore All",
+    Description = "Restaura todos los textos",
+    Callback = function()
+        privacyRedactor:restore()
+        privacyRedactor.NameEnabled = false
+        privacyRedactor.StatsEnabled = false
+        Fluent:Notify({ Title = "SLK VORTEX PRIVATE", Content = "Textos restaurados", Duration = 3, Image = SLK_IMAGE })
+    end
+})
+
+Tabs.Main:AddSection("🎮 Other")
+
+Tabs.Main:AddToggle("InfiniteJumpToggle", {
+    Title = "Infinite Jump",
+    Description = "Salto infinito",
+    Default = false,
+    Callback = function(state) _G.SLKInfiniteJump = state end
+})
+
+services.UserInputService.JumpRequest:Connect(function()
+    if _G.SLKInfiniteJump then
+        local char = services.Players.LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum:ChangeState("Jumping") end
+        end
+    end
+end)
+
+Tabs.Main:AddToggle("HidePetsToggle", {
+    Title = "Hide Pets",
+    Description = "Oculta tus mascotas",
+    Default = false,
+    Callback = function(state)
+        if utils.remotes.ShowPetsEvent then
+            pcall(function() utils.remotes.ShowPetsEvent:FireServer(state and "hidePets" or "showPets") end)
+        end
+    end
+})
+
+Tabs.Main:AddDropdown("TimeDropdown", {
+    Title = "Change Time",
+    Description = "Cambia la hora del juego",
+    Values = { "Day", "Night" },
+    Default = 1,
+    Multi = false,
+    Callback = function(option)
+        services.Lighting.ClockTime = option == "Night" and 0 or 9
+    end
+})
+
+Tabs.Main:AddToggle("FortuneWheelToggle", {
+    Title = "Spin Fortune Wheel",
+    Description = "Gira la rueda de la fortuna",
+    Default = false,
+    Callback = function(state)
+        _G.SLKFortuneWheel = state
+        if not state then return end
+        task.spawn(function()
+            while _G.SLKFortuneWheel do
+                local remote = utils.remotes.OpenFortuneWheelRemote
+                local shared = services.ReplicatedStorage:FindFirstChild("shared")
+                local catalogs = shared and shared:FindFirstChild("catalogs")
+                local chances = catalogs and catalogs:FindFirstChild("fortuneWheelChances")
+                local wheelChances = chances and chances:FindFirstChild("Fortune Wheel")
+                if remote and wheelChances then
+                    pcall(function() remote:InvokeServer("openFortuneWheel", wheelChances) end)
+                end
+                task.wait(1)
+            end
+        end)
+    end
+})
+
+-- TAB FARMING
+Tabs.Farm:AddSection("🔄 Auto Rebirth (Simple)")
+
+Tabs.Farm:AddInput("RebirthTargetInput", {
+    Title = "Rebirth Target",
+    Description = "Objetivo de rebirths (0 = inf)",
+    Default = "0",
+    Placeholder = "0",
+    Numeric = true,
+    Finished = false,
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num and num >= 0 then _G.SLKRebirthTarget = math.floor(num) end
+    end
+})
+
+Tabs.Farm:AddToggle("AutoRebirthToggle", {
+    Title = "Auto Rebirth",
+    Description = "Hace rebirth cuando tienes la fuerza necesaria",
+    Default = false,
+    Callback = function(state)
+        _G.SLKAutoRebirth = state
+        if not state then return end
+        task.spawn(function()
+            while _G.SLKAutoRebirth do
+                local target = _G.SLKRebirthTarget or 0
+                local currentReb = utils.playerData.Rebirths and utils.playerData.Rebirths.Value or 0
+                if target > 0 and currentReb >= target then
+                    _G.SLKAutoRebirth = false
+                    break
+                end
+                if utils.remotes.RebirthRemote then
+                    pcall(function() utils.remotes.RebirthRemote:InvokeServer("rebirthRequest") end)
+                end
+                task.wait(0.5)
+            end
+        end)
+    end
+})
+
+Tabs.Farm:AddToggle("AutoSizeToggle", {
+    Title = "Auto Size 1",
+    Description = "Resetea tamaño a 1",
+    Default = false,
+    Callback = function(state)
+        _G.SLKAutoSize = state
+        if not state then return end
+        task.spawn(function()
+            while _G.SLKAutoSize do
+                if utils.playerData.Character and utils.remotes.ChangeSpeedSize then
+                    pcall(function() utils.remotes.ChangeSpeedSize:InvokeServer("changeSize", 1) end)
+                end
+                task.wait(0.5)
+            end
+        end)
+    end
+})
+
+Tabs.Farm:AddToggle("AutoKingToggle", {
+    Title = "Auto King",
+    Description = "Teletransporta al Rey Músculo",
+    Default = false,
+    Callback = function(state)
+        _G.SLKAutoKing = state
+        if not state then return end
+        task.spawn(function()
+            local target = CFrame.new(-8665.4, 17.21, -5792.9)
+            while _G.SLKAutoKing do
+                local char = services.Players.LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    if (char.HumanoidRootPart.Position - target.Position).Magnitude > 5 then
+                        pcall(function() char.HumanoidRootPart.CFrame = target end)
+                    end
+                end
+                task.wait(0.5)
+            end
+        end)
+    end
+})
+
+Tabs.Farm:AddSection("💪 Auto Exercises")
+
+Tabs.Farm:AddDropdown("ExerciseDropdown", {
+    Title = "Select Exercise",
+    Description = "Herramienta de ejercicio",
+    Values = { "Weight", "Pushups", "Situps", "Handstands" },
+    Default = 1,
+    Multi = false,
+    Callback = function(option) _G.SLKExercise = option end
+})
+
+Tabs.Farm:AddToggle("ExerciseToggle", {
+    Title = "Start Exercising",
+    Description = "Auto equipa y entrena",
+    Default = false,
+    Callback = function(state)
+        _G.SLKExerciseActive = state
+        if not state then return end
+        task.spawn(function()
+            while _G.SLKExerciseActive do
+                local char = services.Players.LocalPlayer.Character
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                local backpack = services.Players.LocalPlayer:FindFirstChild("Backpack")
+                if char and hum and hum.Health > 0 and _G.SLKExercise then
+                    local toolName = _G.SLKExercise
+                    if not char:FindFirstChild(toolName) and backpack then
+                        local tool = backpack:FindFirstChild(toolName)
+                        if tool then
+                            pcall(function() hum:EquipTool(tool) end)
+                            task.wait(0.2)
+                        end
+                    end
+                    if char:FindFirstChild(toolName) then
+                        local ev = utils.getMuscleEvent()
+                        if ev then pcall(function() ev:FireServer("rep") end) end
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+})
+
+Tabs.Farm:AddToggle("AutoRepToggle", {
+    Title = "Auto Rep (con herramienta)",
+    Description = "Auto-equipa herramienta y envía reps",
+    Default = false,
+    Callback = function(state)
+        _G.SLKAutoRep = state
+        if not state then return end
+        task.spawn(function()
+            while _G.SLKAutoRep do
+                utils.equipTrainingTool()
+                local ev = utils.getMuscleEvent()
+                if ev then pcall(function() ev:FireServer("rep") end) end
+                task.wait(0.1)
+            end
+        end)
+    end
+})
+
+Tabs.Farm:AddSection("🪨 Auto Rock")
+
+local rockData = {
+    ["Tiny Rock - 0 Dura"] = 0, ["Large Rock - 100 Dura"] = 100, ["Punching Rock - 10 Dura"] = 10,
+    ["Golden Rock - 5k Dura"] = 5000, ["Frost Rock - 150k Dura"] = 150000, ["Mythical Rock - 400k Dura"] = 400000,
+    ["Eternal Rock - 750k Dura"] = 750000, ["Legend Rock - 1m Dura"] = 1000000, ["Muscle King Rock - 5m Dura"] = 5000000,
+    ["Jungle Rock - 10m Dura"] = 10000000, ["Industrial Rock - 25m Dura"] = 25000000
+}
+
+local rockNames = {}
+for name in pairs(rockData) do table.insert(rockNames, name) end
+table.sort(rockNames)
+
+Tabs.Farm:AddDropdown("RockDropdown", {
+    Title = "Select Rock",
+    Description = "Roca a farmear",
+    Values = rockNames,
+    Default = 1,
+    Multi = false,
+    Callback = function(option) _G.SLKRock = option end
+})
+
+local machinesFolder = services.Workspace:WaitForChild("machinesFolder", 30)
+
+Tabs.Farm:AddToggle("RockFarmToggle", {
+    Title = "Auto Rock",
+    Description = "Farmea rocas automáticamente",
+    Default = false,
+    Callback = function(state)
+        _G.SLKRockFarm = state
+        if not state then return end
+        task.spawn(function()
+            while _G.SLKRockFarm do
+                task.wait(0.2)
+                local durability = utils.playerData.Durability
+                if durability and _G.SLKRock and machinesFolder then
+                    local needed = rockData[_G.SLKRock]
+                    if needed and durability.Value >= needed then
+                        local char = services.Players.LocalPlayer.Character
+                        if char and char:FindFirstChild("LeftHand") then
+                            for _, v in pairs(machinesFolder:GetDescendants()) do
+                                if v.Name == "neededDurability" and v.Value == needed and v.Parent:FindFirstChild("Rock") then
+                                    pcall(function()
+                                        firetouchinterest(v.Parent.Rock, char.RightHand, 0)
+                                        firetouchinterest(v.Parent.Rock, char.RightHand, 1)
+                                        firetouchinterest(v.Parent.Rock, char.LeftHand, 0)
+                                        firetouchinterest(v.Parent.Rock, char.LeftHand, 1)
+                                    end)
+                                    local ev = utils.getMuscleEvent()
+                                    if ev then
+                                        pcall(function()
+                                            ev:FireServer("punch", "leftHand")
+                                            ev:FireServer("punch", "rightHand")
+                                        end)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+})
+-- =====================================================
+-- SLK VORTEX PRIVATE v17.0 - PARTE 3 de 4
+-- =====================================================
+
+-- TAB FAST
+Tabs.Fast:AddSection("⚡ Fast Rep (Ultra Fast)")
+
+Tabs.Fast:AddToggle("FastRepToggle", {
+    Title = "Fast Rep (Ultra)",
+    Description = "16 reps/frame con Heartbeat = ~960 reps/s efectivas",
+    Default = false,
+    Callback = function(state)
+        _G.SLKFastRep = state
+        if not state then return end
+        task.spawn(function()
+            utils.equipTrainingTool()
+            while _G.SLKFastRep do
+                local char = services.Players.LocalPlayer.Character
+                if char then
+                    local hasTool = false
+                    for _, toolName in ipairs({"Weight", "Pushups", "Situps", "Handstands"}) do
+                        if char:FindFirstChild(toolName) then hasTool = true break end
+                    end
+                    if not hasTool then
+                        utils.equipTrainingTool()
+                    end
+                end
+                local ev = utils.getMuscleEvent()
+                if ev then
+                    for i = 1, 16 do
+                        pcall(function() ev:FireServer("rep") end)
+                    end
+                end
+                services.RunService.Heartbeat:Wait()
+            end
+        end)
+    end
+})
+
+Tabs.Fast:AddParagraph({
+    Title = "Modo Ultra Fast",
+    Content = "16 reps/frame ≈ 960 reps/s. Ni satura ni pierde paquetes."
+})
+
+Tabs.Fast:AddSection("🔄 Fast Rebirth (No Pet Unequip)")
+
+Tabs.Fast:AddInput("FastRebirthTargetInput", {
+    Title = "Rebirth Target",
+    Description = "Objetivo (0 = inf)",
+    Default = "0",
+    Placeholder = "0",
+    Numeric = true,
+    Finished = false,
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num and num >= 0 then _G.SLKFastRebirthTarget = math.floor(num) end
+    end
+})
+
+local function getEquippedPets()
+    local equipped = {}
+    local seen = {}
+    local player = services.Players.LocalPlayer
+    local petsFolder = player:FindFirstChild("petsFolder")
+    if petsFolder then
+        for _, folder in pairs(petsFolder:GetChildren()) do
+            if folder:IsA("Folder") and folder.Name ~= "Unique" then
+                for _, pet in pairs(folder:GetChildren()) do
+                    if not seen[pet.Name] then
+                        table.insert(equipped, {Name = pet.Name, Reference = pet})
+                        seen[pet.Name] = true
+                    end
+                end
+            end
+        end
+    end
+    local char = player.Character
+    if char then
+        for _, obj in pairs(char:GetChildren()) do
+            if obj:IsA("StringValue") or obj:IsA("ObjectValue") or obj:IsA("Model") or obj:IsA("Folder") then
+                if not seen[obj.Name] then
+                    table.insert(equipped, {Name = obj.Name, Reference = obj})
+                    seen[obj.Name] = true
+                end
+            end
+        end
+    end
+    for _, obj in pairs(player:GetDescendants()) do
+        if obj:GetAttribute("Equipped") == true then
+            if not seen[obj.Name] then
+                table.insert(equipped, {Name = obj.Name, Reference = obj})
+                seen[obj.Name] = true
+            end
+        end
+    end
+    return equipped
+end
+
+local function startContinuousReequip(savedPets, durationSeconds)
+    if not savedPets or #savedPets == 0 then return end
+    if not utils.remotes.EquipPetEvent then return end
+    local player = services.Players.LocalPlayer
+    local petsFolder = player:FindFirstChild("petsFolder")
+    local uniqueFolder = petsFolder and petsFolder:FindFirstChild("Unique")
+    task.spawn(function()
+        local startTime = tick()
+        while tick() - startTime < durationSeconds do
+            for _, petInfo in ipairs(savedPets) do
+                local pet = petInfo.Reference
+                if pet and pet.Parent then
+                    pcall(function() utils.remotes.EquipPetEvent:FireServer("equipPet", pet) end)
+                else
+                    if uniqueFolder then
+                        for _, p in pairs(uniqueFolder:GetChildren()) do
+                            if p.Name == petInfo.Name then
+                                pcall(function() utils.remotes.EquipPetEvent:FireServer("equipPet", p) end)
+                                petInfo.Reference = p
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(0.05)
+        end
+    end)
+end
+
+Tabs.Fast:AddToggle("FastRebirthToggle", {
+    Title = "Fast Rebirth (No Pet Unequip)",
+    Description = "Auto-equipa herramienta, farmea, hace rebirth y mantiene pets",
+    Default = false,
+    Callback = function(state)
+        _G.SLKFastRebirth = state
+        if not state then return end
+        task.spawn(function()
+            while _G.SLKFastRebirth do
+                local target = _G.SLKFastRebirthTarget or 0
+                local currentReb = utils.playerData.Rebirths and utils.playerData.Rebirths.Value or 0
+                if target > 0 and currentReb >= target then
+                    _G.SLKFastRebirth = false
+                    Fluent:Notify({
+                        Title = "SLK VORTEX PRIVATE",
+                        Content = "✅ Target alcanzado (" .. currentReb .. " rebirths)",
+                        Duration = 5,
+                        Image = SLK_IMAGE
+                    })
+                    break
+                end
+                local targetStrength = 5000 + currentReb * 2550
+                local currentStrength = utils.playerData.Strength and utils.playerData.Strength.Value or 0
+                if currentStrength >= targetStrength then
+                    Fluent:Notify({
+                        Title = "SLK VORTEX PRIVATE",
+                        Content = "🔄 Rebirth #" .. (currentReb + 1),
+                        Duration = 2,
+                        Image = SLK_IMAGE
+                    })
+                    local savedPets = getEquippedPets()
+                    if #savedPets > 0 then
+                        startContinuousReequip(savedPets, 6)
+                    end
+                    local rebirthBefore = currentReb
+                    local attempts = 0
+                    repeat
+                        if utils.remotes.RebirthRemote then
+                            pcall(function() utils.remotes.RebirthRemote:InvokeServer("rebirthRequest") end)
+                        end
+                        for _, petInfo in ipairs(savedPets) do
+                            if petInfo.Reference and petInfo.Reference.Parent then
+                                pcall(function() utils.remotes.EquipPetEvent:FireServer("equipPet", petInfo.Reference) end)
+                            end
+                        end
+                        task.wait(0.1)
+                        attempts = attempts + 1
+                        currentReb = utils.playerData.Rebirths and utils.playerData.Rebirths.Value or 0
+                    until not _G.SLKFastRebirth or currentReb > rebirthBefore or attempts >= 20
+                    task.wait(1)
+                    if #savedPets > 0 then
+                        startContinuousReequip(savedPets, 2)
+                        task.wait(1)
+                    end
+                else
+                    utils.equipTrainingTool()
+                    local ev = utils.getMuscleEvent()
+                    if ev then
+                        for i = 1, 14 do
+                            pcall(function() ev:FireServer("rep") end)
+                        end
+                    end
+                    task.wait(0.05)
+                end
+            end
+        end)
+    end
+})
+
+Tabs.Fast:AddParagraph({
+    Title = "Anti-Unequip + Auto-Equip",
+    Content = "Auto-equipa herramienta, farmea, hace rebirth y mantiene tus mascotas equipadas."
+})
+
+-- TAB PETS
+Tabs.Pets:AddSection("🛒 Pet Shop")
+
+local petShopRuntime = services.ReplicatedStorage:WaitForChild("shared", 30)
+petShopRuntime = petShopRuntime and petShopRuntime:WaitForChild("runtime", 30)
+local petShopFolder = petShopRuntime and petShopRuntime:WaitForChild("cPetShopFolder", 30)
+
+local petList, auraList = {}, {}
+
+if petShopFolder then
+    for _, item in ipairs(petShopFolder:GetChildren()) do
+        if item:GetAttribute("IsPowerUp") == true then
+            table.insert(auraList, item.Name)
+        else
+            table.insert(petList, item.Name)
+        end
+    end
+    table.sort(petList)
+    table.sort(auraList)
+end
+
+local selectedPets = {}
+local selectedAuras = {}
+local selectedEvolve = {}
+
+Tabs.Pets:AddDropdown("SelectPetsDropdown", {
+    Title = "Select Pets",
+    Description = "Mascotas a comprar",
+    Values = petList,
+    Default = {},
+    Multi = true,
+    Callback = function(option)
+        if type(option) == "table" then selectedPets = option end
+    end
+})
+
+Tabs.Pets:AddInput("BuyAmountInput", {
+    Title = "Buy Amount",
+    Description = "Cantidad a comprar",
+    Default = "1",
+    Placeholder = "1",
+    Numeric = true,
+    Finished = false,
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num and num > 0 then _G.SLKBuyAmount = math.floor(num) end
+    end
+})
+
+Tabs.Pets:AddToggle("BuyPetToggle", {
+    Title = "Buy Pet",
+    Description = "Compra las mascotas seleccionadas",
+    Default = false,
+    Callback = function(state)
+        _G.SLKBuyPet = state
+        if not state then return end
+        task.spawn(function()
+            while _G.SLKBuyPet do
+                for _, petName in pairs(selectedPets) do
+                    local selected = petShopFolder and petShopFolder:FindFirstChild(petName)
+                    if selected and utils.remotes.PetShopRemote then
+                        for _ = 1, (_G.SLKBuyAmount or 1) do
+                            task.spawn(function(sel)
+                                pcall(function() utils.remotes.PetShopRemote:InvokeServer(sel) end)
+                            end, selected)
+                        end
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+})
+
+Tabs.Pets:AddSection("✨ Auras")
+
+Tabs.Pets:AddDropdown("SelectAurasDropdown", {
+    Title = "Select Auras",
+    Description = "Auras a comprar",
+    Values = auraList,
+    Default = {},
+    Multi = true,
+    Callback = function(option)
+        if type(option) == "table" then selectedAuras = option end
+    end
+})
+
+Tabs.Pets:AddToggle("BuyAuraToggle", {
+    Title = "Buy Aura",
+    Description = "Compra las auras seleccionadas",
+    Default = false,
+    Callback = function(state)
+        _G.SLKBuyAura = state
+        if not state then return end
+        task.spawn(function()
+            while _G.SLKBuyAura do
+                for _, auraName in pairs(selectedAuras) do
+                    local selected = petShopFolder and petShopFolder:FindFirstChild(auraName)
+                    if selected and utils.remotes.PetShopRemote then
+                        for _ = 1, (_G.SLKBuyAmount or 1) do
+                            task.spawn(function(sel)
+                                pcall(function() utils.remotes.PetShopRemote:InvokeServer(sel) end)
+                            end, selected)
+                        end
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+})
+
+Tabs.Pets:AddSection("🧬 Auto Evolve")
+
+Tabs.Pets:AddDropdown("EvolveDropdown", {
+    Title = "Evolve Pets",
+    Description = "Mascotas a evolucionar",
+    Values = petList,
+    Default = {},
+    Multi = true,
+    Callback = function(option)
+        if type(option) == "table" then selectedEvolve = option end
+    end
+})
+
+Tabs.Pets:AddToggle("AutoEvolveToggle", {
+    Title = "Auto Evolve",
+    Description = "Evoluciona las mascotas seleccionadas",
+    Default = false,
+    Callback = function(state)
+        _G.SLKAutoEvolve = state
+        if not state then return end
+        task.spawn(function()
+            while _G.SLKAutoEvolve do
+                for _, petName in pairs(selectedEvolve) do
+                    if utils.remotes.PetEvolveEvent then
+                        pcall(function() utils.remotes.PetEvolveEvent:FireServer("evolvePet", petName) end)
+                    end
+                end
+                task.wait(0.5)
+            end
+        end)
+    end
+})
+
+Tabs.Pets:AddParagraph({
+    Title = "Info",
+    Content = "Necesitas Gemas y espacio en el inventario."
+})
+-- =====================================================
+-- SLK VORTEX PRIVATE v17.0 - PARTE 4 de 4
+-- =====================================================
+
+-- TAB KILLING
+Tabs.Kill:AddSection("⚔️ Kill Aura")
+
+_G.SLKWhitelisted = _G.SLKWhitelisted or {}
+
+local function isWhitelisted(player)
+    for _, name in ipairs(_G.SLKWhitelisted) do
+        if name:lower() == player.Name:lower() then return true end
+    end
+    return false
+end
+
+local function isPlayerAlive(player)
+    return player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and
+        player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0
+end
+
+local function attackPlayer(target)
+    if not isPlayerAlive(target) or isWhitelisted(target) then return end
+    local char = services.Players.LocalPlayer.Character
+    if not char then return end
+    local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+    local localRoot = char:FindFirstChild("HumanoidRootPart")
+    if not targetRoot or not localRoot then return end
+    localRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 3.5, 0)
+    localRoot.AssemblyLinearVelocity = Vector3.zero
+    localRoot.AssemblyAngularVelocity = Vector3.zero
+    services.RunService.Heartbeat:Wait()
+    local hand = char:FindFirstChild("LeftHand") or char:FindFirstChild("RightHand")
+    if not hand then return end
+    pcall(function()
+        firetouchinterest(targetRoot, hand, 0)
+        firetouchinterest(targetRoot, hand, 1)
+    end)
+    local ev = utils.getMuscleEvent()
+    if ev then
+        pcall(function()
+            ev:FireServer("punch", hand.Name == "LeftHand" and "leftHand" or "rightHand")
+        end)
+    end
+end
+
+Tabs.Kill:AddToggle("KillAuraToggle", {
+    Title = "Kill Aura",
+    Description = "Ataca a todos los jugadores cerca",
+    Default = false,
+    Callback = function(state)
+        _G.SLKKillAura = state
+        if not state then return end
+        task.spawn(function()
+            while _G.SLKKillAura do
+                for _, player in ipairs(services.Players:GetPlayers()) do
+                    if player ~= services.Players.LocalPlayer and isPlayerAlive(player) and not isWhitelisted(player) then
+                        pcall(function() attackPlayer(player) end)
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+})
+
+Tabs.Kill:AddToggle("KillAllToggle", {
+    Title = "Kill Everyone",
+    Description = "Ataca a todos sin parar",
+    Default = false,
+    Callback = function(state)
+        _G.SLKKillAll = state
+        if not state then return end
+        task.spawn(function()
+            while _G.SLKKillAll do
+                for _, player in ipairs(services.Players:GetPlayers()) do
+                    if player ~= services.Players.LocalPlayer and not isWhitelisted(player) and isPlayerAlive(player) then
+                        for _ = 1, 4 do
+                            pcall(function() attackPlayer(player) end)
+                            task.wait(0.05)
+                        end
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+})
+
+Tabs.Kill:AddSection("📝 Whitelist (Jugadores)")
+
+local whitelistValues = {}
+for _, player in ipairs(services.Players:GetPlayers()) do
+    if player ~= services.Players.LocalPlayer then
+        table.insert(whitelistValues, player.Name)
+    end
+end
+
+Tabs.Kill:AddDropdown("WhitelistDropdown", {
+    Title = "Add to Whitelist",
+    Description = "Jugadores que no serán atacados",
+    Values = whitelistValues,
+    Default = 1,
+    Multi = false,
+    Callback = function(option)
+        for _, name in ipairs(_G.SLKWhitelisted) do
+            if name:lower() == option:lower() then return end
+        end
+        table.insert(_G.SLKWhitelisted, option)
+    end
+})
+
+Tabs.Kill:AddButton({
+    Title = "Clear Whitelist",
+    Description = "Elimina toda la lista blanca",
+    Callback = function()
+        _G.SLKWhitelisted = {}
+        Fluent:Notify({
+            Title = "SLK VORTEX PRIVATE",
+            Content = "Whitelist limpiada",
+            Duration = 3,
+            Image = SLK_IMAGE
+        })
+    end
+})
+
+-- TAB STATS
+local statsData = {
+    StartTime = tick(),
+    StartStrength = utils.playerData.Strength and utils.playerData.Strength.Value or 0,
+    StartRebirths = utils.playerData.Rebirths and utils.playerData.Rebirths.Value or 0,
+    LastTextS = "",
+    LastTextR = "",
+    LastTextTime = ""
+}
+
+local function formatTiempo(segundos)
+    if segundos < 60 then return string.format("%ds", math.floor(segundos))
+    elseif segundos < 3600 then return string.format("%dm %ds", math.floor(segundos / 60), math.floor(segundos % 60))
+    elseif segundos < 86400 then return string.format("%dh %dm", math.floor(segundos / 3600), math.floor((segundos % 3600) / 60))
+    else return string.format("%dd %dh", math.floor(segundos / 86400), math.floor((segundos % 86400) / 3600)) end
+end
+
+local strengthPara = Tabs.Stats:AddParagraph({
+    Title = "💪 Strength",
+    Content = "Gained: 0 | x1h: 0 | x1d: 0"
+})
+
+local rebirthPara = Tabs.Stats:AddParagraph({
+    Title = "🔄 Rebirths",
+    Content = "Gained: 0 | x1h: 0"
+})
+
+local sessionPara = Tabs.Stats:AddParagraph({
+    Title = "⏱️ Session",
+    Content = "0s"
+})
+
+task.spawn(function()
+    while true do
+        pcall(function()
+            local elapsed = tick() - statsData.StartTime
+            if elapsed > 1 and utils.playerData.Strength and utils.playerData.Rebirths then
+                local currentStrength = utils.playerData.Strength.Value
+                local currentRebirths = utils.playerData.Rebirths.Value
+                local gainS = currentStrength - statsData.StartStrength
+                local gainR = currentRebirths - statsData.StartRebirths
+                if gainS < 0 then
+                    statsData.StartStrength = currentStrength
+                    gainS = 0
+                end
+                if gainR < 0 then
+                    statsData.StartRebirths = currentRebirths
+                    gainR = 0
+                end
+                local sH = (gainS / elapsed) * 3600
+                local sD = sH * 24
+                local rH = (gainR / elapsed) * 3600
+                local textS = "Gained: " .. utils.formatNumber(gainS) .. " | x1h: " .. utils.formatNumber(sH) .. " | x1d: " .. utils.formatNumber(sD)
+                local textR = "Gained: " .. utils.formatWithCommas(gainR) .. " | x1h: " .. utils.formatWithCommas(rH)
+                local textT = formatTiempo(elapsed)
+                if textS ~= statsData.LastTextS then
+                    pcall(function() strengthPara:SetDesc(textS) end)
+                    statsData.LastTextS = textS
+                end
+                if textR ~= statsData.LastTextR then
+                    pcall(function() rebirthPara:SetDesc(textR) end)
+                    statsData.LastTextR = textR
+                end
+                if textT ~= statsData.LastTextTime then
+                    pcall(function() sessionPara:SetDesc(textT) end)
+                    statsData.LastTextTime = textT
+                end
+            end
+        end)
+        task.wait(1)
+    end
+end)
+
+-- TAB INFO
+Tabs.Info:AddSection("SLK VORTEX PRIVATE")
+
+Tabs.Info:AddParagraph({
+    Title = "Version 17.0",
+    Content = "Interfaz: Fluent UI | Developer: SLK Team"
+})
+
+Tabs.Info:AddParagraph({
+    Title = "Controles",
+    Content = "RightShift o botón flotante 'SLK' para mostrar/ocultar"
+})
+
+Tabs.Info:AddParagraph({
+    Title = "Whitelist",
+    Content = "Controlada desde Pastebin externo."
+})
+
+-- CONFIGURACIÓN DE FLUENT
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+InterfaceManager:SetFolder("SLK_VORTEX_PRIVATE")
+SaveManager:SetFolder("SLK_VORTEX_PRIVATE")
+SaveManager:BuildConfigSection(Tabs.Info)
+InterfaceManager:ApplyToTab(Tabs.Info)
+
+-- ANTI-AFK
+utils.connect(services.Players.LocalPlayer.Idled, function()
+    pcall(function()
+        services.VirtualUser:CaptureController()
+        services.VirtualUser:ClickButton2(Vector2.new(0, 0))
+        services.VirtualUser:ClickButton1(Vector2.new(0, 0))
+    end)
+end)
+
+-- RESPAWN HANDLER
+utils.connect(services.Players.LocalPlayer.CharacterAdded, function(character)
+    utils.playerData.Character = character
+    utils.playerData.Humanoid = character:WaitForChild("Humanoid", 10)
+    utils.playerData.Backpack = services.Players.LocalPlayer:WaitForChild("Backpack")
+    task.wait(1)
+    utils.remotes.MuscleEvent = utils.getMuscleEvent()
+end)
+
+-- NOTIFICACIÓN FINAL
+Fluent:Notify({
+    Title = "SLK VORTEX PRIVATE",
+    Content = "✅ Script cargado. Botón flotante 'SLK' activo.",
+    Duration = 5,
+    Image = SLK_IMAGE
+})
+
+print("[SLK VORTEX PRIVATE v17.0] Cargado. Botón flotante en pantalla.")
