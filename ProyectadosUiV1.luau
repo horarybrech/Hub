@@ -2,11 +2,11 @@
     Modified Elerium V2
 	EleriumV2 was made by github.com/memejames
 	Project url: https://github.com/memejames/elerium-v2-ui-library
-	modified by Horarybrech
+	modified by Henrik @xyzhenrik
 ]]
 
 local ui_options = {
-	main_color = Color3.fromRGB(41, 74, 122),
+	main_color = Color3.fromRGB(142, 68, 173),
 	min_size = Vector2.new(400, 300),
 	toggle_key = Enum.KeyCode.RightShift,
 	can_resize = true,
@@ -58,7 +58,7 @@ local tabSelection = Instance.new("ImageLabel")
 local tabButtons = Instance.new("Frame")
 local uiListLayout = Instance.new("UIListLayout")
 local frame = Instance.new("Frame")
-local tab = Instance.new("ScrollingFrame") -- [SOLUCIÓN 1] Cambiado a ScrollingFrame
+local tab = Instance.new("Frame")
 local uiListLayout2 = Instance.new("UIListLayout")
 local textBox = Instance.new("TextBox")
 local textBoxRoundify4px = Instance.new("ImageLabel")
@@ -121,7 +121,8 @@ local CoreGui= cloneref(game:GetService("CoreGui"))
 
 imgui.Name = "imgui"
 imgui.Parent = gethui and gethui() or (CoreGui or game.Players.LocalPlayer:WaitForChild("PlayerGui"))
-imgui.ResetOnSpawn = false
+imgui.IgnoreGuiInset = true
+imgui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 prefabs.Name = "Prefabs"
 prefabs.Parent = imgui
@@ -178,7 +179,7 @@ toggle.Position = UDim2.new(0, 5, 0, -2)
 toggle.Rotation = 0
 toggle.Size = UDim2.new(0, 20, 0, 20)
 toggle.ZIndex = 2
-toggle.Image = "" -- Imagen transparente
+toggle.Image = ""
 
 local toggleCorner = Instance.new("UICorner")
 toggleCorner.CornerRadius = UDim.new(0.5, 0)
@@ -255,16 +256,11 @@ frame.BorderSizePixel = 0
 frame.Position = UDim2.new(0, 0, 1, 0)
 frame.Size = UDim2.new(1, 0, 0, 2)
 
--- [SOLUCIÓN 1] Configuración del Scroll para las pestañas
 tab.Name = "Tab"
 tab.Parent = prefabs
 tab.BackgroundColor3 = Color3.new(1, 1, 1)
 tab.BackgroundTransparency = 1
-tab.BorderSizePixel = 0
 tab.Size = UDim2.new(1, 0, 1, 0)
-tab.CanvasSize = UDim2.new(0, 0, 0, 0)
-tab.AutomaticCanvasSize = Enum.AutomaticSize.Y
-tab.ScrollBarThickness = 2
 tab.Visible = false
 
 uiListLayout2.Parent = tab
@@ -851,37 +847,27 @@ windowsFrame.BackgroundColor3 = Color3.new(1, 1, 1)
 windowsFrame.BackgroundTransparency = 1
 windowsFrame.Position = UDim2.new(0, 20, 0, 20)
 windowsFrame.Size = UDim2.new(1, 20, 1, -20)
+windowsFrame.Visible = true
 
--- ==========================================
--- Botón Flotante para Ocultar/Mostrar la GUI
--- ==========================================
+-- Botón flotante integrado dentro del mismo ScreenGui con clics garantizados en PC y móvil
 local toggleGuiBtn = Instance.new("TextButton")
-toggleGuiBtn.Name = "ToggleGuiButton"
+toggleGuiBtn.Name = "ToggleGui"
 toggleGuiBtn.Parent = imgui
 toggleGuiBtn.Size = UDim2.new(0, 40, 0, 40)
-toggleGuiBtn.Position = UDim2.new(0, 15, 0, 50) 
+toggleGuiBtn.Position = UDim2.new(0, 15, 0, 50)
 toggleGuiBtn.BackgroundColor3 = ui_options.main_color
 toggleGuiBtn.BorderSizePixel = 0
 toggleGuiBtn.Text = "👁"
 toggleGuiBtn.TextColor3 = Color3.new(1, 1, 1)
 toggleGuiBtn.TextSize = 20
 toggleGuiBtn.Font = Enum.Font.GothamBold
+toggleGuiBtn.Active = true
+toggleGuiBtn.Draggable = true
+toggleGuiBtn.ZIndex = 100000
 
-local toggleGuiUICorner = Instance.new("UICorner")
-toggleGuiUICorner.CornerRadius = UDim.new(1, 0)
-toggleGuiUICorner.Parent = toggleGuiBtn
-
-toggleGuiBtn.MouseButton1Click:Connect(function()
-	windowsFrame.Visible = not windowsFrame.Visible
-	local isVisible = windowsFrame.Visible
-	toggleGuiBtn.Text = isVisible and "👁" or "✖"
-	if not isVisible then
-		toggleGuiBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
-	else
-		toggleGuiBtn.BackgroundColor3 = ui_options.main_color
-	end
-end)
--- ==========================================
+local toggleCornerBtn = Instance.new("UICorner")
+toggleCornerBtn.CornerRadius = UDim.new(1, 0)
+toggleCornerBtn.Parent = toggleGuiBtn
 
 --[[ Script ]]--
 local root = imgui
@@ -901,21 +887,31 @@ local checks = {
 	["binding"] = false,
 }
 
+toggleGuiBtn.MouseButton1Click:Connect(function()
+	if not checks.binding then
+		windowsFrame.Visible = not windowsFrame.Visible
+		for _, v in ipairs(windowsFrame:GetChildren()) do
+			if v:IsA("ImageLabel") then
+				v.Visible = windowsFrame.Visible
+			end
+		end
+		toggleGuiBtn.Text = windowsFrame.Visible and "👁" or "✖"
+		toggleGuiBtn.BackgroundColor3 = windowsFrame.Visible and ui_options.main_color or Color3.fromRGB(150, 50, 50)
+	end
+end)
+
 UIS.InputBegan:Connect(function(input, gameProcessed)
 	if input.KeyCode == ((typeof(ui_options.toggle_key) == "EnumItem") and ui_options.toggle_key or Enum.KeyCode.RightShift) then
 		if root then
 			if not checks.binding then
 				windowsFrame.Visible = not windowsFrame.Visible
-				local isVisible = windowsFrame.Visible
-				local toggleBtn = root:FindFirstChild("ToggleGuiButton")
-				if toggleBtn then
-					toggleBtn.Text = isVisible and "👁" or "✖"
-					if not isVisible then
-						toggleBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
-					else
-						toggleBtn.BackgroundColor3 = ui_options.main_color 
+				for _, v in ipairs(windowsFrame:GetChildren()) do
+					if v:IsA("ImageLabel") then
+						v.Visible = windowsFrame.Visible
 					end
 				end
+				toggleGuiBtn.Text = windowsFrame.Visible and "👁" or "✖"
+				toggleGuiBtn.BackgroundColor3 = windowsFrame.Visible and ui_options.main_color or Color3.fromRGB(150, 50, 50)
 			end
 		end
 	end
@@ -928,7 +924,7 @@ local function Resize(part, new, _delay)
 	tween:Play()
 end
 
-local function rgbtohsv(r, g, b) 
+local function rgbtohsv(r, g, b)
 	r, g, b = r / 255, g / 255, b / 255
 	local max, min = math.max(r, g, b), math.min(r, g, b)
 	local h, s, v
@@ -970,7 +966,7 @@ local function hasprop(object, prop)
 end
 
 local function gNameLen(obj)
-	return obj.TextBounds.X + 15
+	return math.max(obj.TextBounds.X + 24, 60)
 end
 
 local function gMouse()
@@ -1117,7 +1113,7 @@ local function format_windows()
 	local data = {}
 
 	for i,v in pairs(windowsFrame:GetChildren()) do
-		if not (v:IsA("UIListLayout")) then
+		if not (v:IsA("UIListLayout") or v == toggleGuiBtn) then
 			data[v] = v.AbsolutePosition
 		end
 	end
@@ -1145,6 +1141,7 @@ function library:AddWindow(title, options)
 	Window:FindFirstChild("Title").Text = title
 	Window.Size = UDim2.new(0, options.min_size.X, 0, options.min_size.Y)
 	Window.ZIndex = Window.ZIndex + (windows * 10)
+	Window.Visible = true
 
 	do -- Altering Window Color
 		local Title = Window:FindFirstChild("Title")
@@ -1162,10 +1159,6 @@ function library:AddWindow(title, options)
 				Top.ImageColor3 = options.main_color
 				SplitFrame.BackgroundColor3 = options.main_color
 
-				if imgui and imgui:FindFirstChild("ToggleGuiButton") and windowsFrame.Visible then
-					imgui.ToggleGuiButton.BackgroundColor3 = options.main_color
-				end
-
 				RS.Heartbeat:Wait()
 			end
 		end)
@@ -1175,48 +1168,7 @@ function library:AddWindow(title, options)
 	local Resizer = Window:WaitForChild("Resizer")
 
 	local window_data = {}
-	Window.Draggable = false -- [SOLUCIÓN 2] Desactiva el drag por defecto
-
-    -- [SOLUCIÓN 2] Lógica Custom Drag (Arrastre solo desde el título)
-	local dragging
-	local dragInput
-	local dragStart
-	local startPos
-
-	local function updateDrag(input)
-		local delta = input.Position - dragStart
-		Window.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-	end
-
-	Window.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			-- Verifica si el ratón está en los 35 píxeles superiores (la barra de título)
-			local relativeY = input.Position.Y - Window.AbsolutePosition.Y
-			if relativeY <= 35 then
-				dragging = true
-				dragStart = input.Position
-				startPos = Window.Position
-
-				input.Changed:Connect(function()
-					if input.UserInputState == Enum.UserInputState.End then
-						dragging = false
-					end
-				end)
-			end
-		end
-	end)
-
-	Window.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			dragInput = input
-		end
-	end)
-
-	UIS.InputChanged:Connect(function(input)
-		if input == dragInput and dragging then
-			updateDrag(input)
-		end
-	end)
+	Window.Draggable = true
 
 	function window_data:SetTitle(new_title)
 		Window:FindFirstChild("Title").Text = tostring(new_title or "New Window")
@@ -1226,6 +1178,7 @@ function library:AddWindow(title, options)
 		local oldIcon = mouse.Icon
 		local Entered = false
 		Resizer.MouseEnter:Connect(function()
+			Window.Draggable = false
 			if options.can_resize then
 				oldIcon = mouse.Icon
 			end
@@ -1237,6 +1190,7 @@ function library:AddWindow(title, options)
 			if options.can_resize then
 				mouse.Icon = oldIcon
 			end
+			Window.Draggable = true
 		end)
 
 		local Held = false
@@ -1244,7 +1198,7 @@ function library:AddWindow(title, options)
 			if inputObject.UserInputType == Enum.UserInputType.MouseButton1 then
 				Held = true
 
-				spawn(function() -- Loop check
+				spawn(function()
 					if Entered and Resizer.Active and options.can_resize then
 						while Held and Resizer.Active do
 
@@ -1252,7 +1206,6 @@ function library:AddWindow(title, options)
 							local x = mouse_location.X - Window.AbsolutePosition.X
 							local y = mouse_location.Y - Window.AbsolutePosition.Y
 
-							--
 							if x >= options.min_size.X and y >= options.min_size.Y then
 								Resize(Window, {Size = UDim2.new(0, x, 0, y)}, options.tween_time)
 							elseif x >= options.min_size.X then
@@ -1288,8 +1241,6 @@ function library:AddWindow(title, options)
 				canopen = false
 
 				if open then
-					-- Close
-
 					oldwindowdata = {}
 					for i,v in pairs(Window:FindFirstChild("Tabs"):GetChildren()) do
 						oldwindowdata[v] = v.Visible
@@ -1303,8 +1254,6 @@ function library:AddWindow(title, options)
 					open_close.Parent:FindFirstChild("Base").Transparency = 1
 
 				else
-					-- Open
-
 					for i,v in pairs(oldwindowdata) do
 						i.Visible = v
 					end
@@ -1336,11 +1285,13 @@ function library:AddWindow(title, options)
 				tab_selection.Visible = true
 
 				local new_button = prefabs:FindFirstChild("TabButton"):Clone()
-				new_button.Parent = tab_buttons
 				new_button.Text = tab_name
+				new_button.Parent = tab_buttons -- Asignar primero al padre para que calcule las propiedades de texto correctamente
 				new_button.Size = UDim2.new(0, gNameLen(new_button), 0, 20)
 				new_button.ZIndex = new_button.ZIndex + (windows * 10)
-				new_button:GetChildren()[1].ZIndex = new_button:GetChildren()[1].ZIndex + (windows * 10)
+				if new_button:GetChildren()[1] then
+					new_button:GetChildren()[1].ZIndex = new_button:GetChildren()[1].ZIndex + (windows * 10)
+				end
 
 				local new_tab = prefabs:FindFirstChild("Tab"):Clone()
 				new_tab.Parent = tabs
@@ -1350,7 +1301,9 @@ function library:AddWindow(title, options)
 					if dropdown_open then return end
 					for i, v in pairs(tab_buttons:GetChildren()) do
 						if not (v:IsA("UIListLayout")) then
-							v:GetChildren()[1].ImageColor3 = Color3.fromRGB(52, 53, 56)
+							if v:GetChildren()[1] then
+								v:GetChildren()[1].ImageColor3 = Color3.fromRGB(52, 53, 56)
+							end
 							Resize(v, {Size = UDim2.new(0, v.AbsoluteSize.X, 0, 20)}, options.tween_time)
 						end
 					end
@@ -1359,7 +1312,9 @@ function library:AddWindow(title, options)
 					end
 
 					Resize(new_button, {Size = UDim2.new(0, new_button.AbsoluteSize.X, 0, 25)}, options.tween_time)
-					new_button:GetChildren()[1].ImageColor3 = Color3.fromRGB(73, 75, 79)
+					if new_button:GetChildren()[1] then
+						new_button:GetChildren()[1].ImageColor3 = Color3.fromRGB(73, 75, 79)
+					end
 					new_tab.Visible = true
 				end
 
@@ -1373,7 +1328,7 @@ function library:AddWindow(title, options)
 
 				do -- Tab Elements
 
-					function tab_data:AddLabel(label_text) -- [Label]
+					function tab_data:AddLabel(label_text)
 						label_text = tostring(label_text or "New Label")
 
 						local label = prefabs:FindFirstChild("Label"):Clone()
@@ -1388,7 +1343,7 @@ function library:AddWindow(title, options)
 						return label
 					end
 
-					function tab_data:AddButton(button_text, callback) -- [Button]
+					function tab_data:AddButton(button_text, callback)
 						button_text = tostring(button_text or "New Button")
 						callback = typeof(callback) == "function" and callback or function()end
 
@@ -1417,7 +1372,7 @@ function library:AddWindow(title, options)
 						return button
 					end
 
-					function tab_data:AddSwitch(switch_text, callback) -- [Switch]
+					function tab_data:AddSwitch(switch_text, callback)
 						local switch_data = {}
 
 						switch_text = tostring(switch_text or "New Switch")
@@ -1512,13 +1467,15 @@ function library:AddWindow(title, options)
 
 						title.Text = slider_text
 
-						do -- Slider Math
+						do
 							local Entered = false
 							slider.MouseEnter:Connect(function()
 								Entered = true
+								Window.Draggable = false
 							end)
 							slider.MouseLeave:Connect(function()
 								Entered = false
+								Window.Draggable = true
 							end)
 
 							local Held = false
@@ -1526,38 +1483,36 @@ function library:AddWindow(title, options)
 								if inputObject.UserInputType == Enum.UserInputType.MouseButton1 then
 									Held = true
 
-									spawn(function() -- Loop check
-										if Entered and not slider_options.readonly then
-											while Held and (not dropdown_open) do
-												local mouse_location = gMouse()
-												local x = (slider.AbsoluteSize.X - (slider.AbsoluteSize.X - ((mouse_location.X - slider.AbsolutePosition.X)) + 1)) / slider.AbsoluteSize.X
+									spawn(function()
+										while Held and Entered and (not dropdown_open) do
+											local mouse_location = gMouse()
+											local x = (slider.AbsoluteSize.X - (slider.AbsoluteSize.X - ((mouse_location.X - slider.AbsolutePosition.X)) + 1)) / slider.AbsoluteSize.X
 
-												local min = 0
-												local max = 1
+											local min = 0
+											local max = 1
 
-												local size = min
-												if x >= min and x <= max then
-													size = x
-												elseif x < min then
-													size = min
-												elseif x > max then
-													size = max
-												end
-
-												Resize(indicator, {Size = UDim2.new(size or min, 0, 0, 20)}, options.tween_time)
-												local p = math.floor((size or min) * 100)
-
-												local maxv = slider_options.max
-												local minv = slider_options.min
-												local diff = maxv - minv
-
-												local sel_value = math.floor(((diff / 100) * p) + minv)
-
-												value.Text = tostring(sel_value)
-												pcall(callback, sel_value)
-
-												RS.Heartbeat:Wait()
+											local size = min
+											if x >= min and x <= max then
+												size = x
+											elseif x < min then
+												size = min
+											elseif x > max then
+												size = max
 											end
+
+											Resize(indicator, {Size = UDim2.new(size or min, 0, 0, 20)}, options.tween_time)
+											local p = math.floor((size or min) * 100)
+
+											local maxv = slider_options.max
+											local minv = slider_options.min
+											local diff = maxv - minv
+
+											local sel_value = math.floor(((diff / 100) * p) + minv)
+
+											value.Text = tostring(sel_value)
+											pcall(callback, sel_value)
+
+											RS.Heartbeat:Wait()
 										end
 									end)
 								end
@@ -1613,7 +1568,7 @@ function library:AddWindow(title, options)
 						title.Text = "  " .. keybind_name
 						keybind.Size = UDim2.new(0, gNameLen(title) + 80, 0, 20)
 
-						local shortkeys = { 
+						local shortkeys = {
 							RightControl = 'RightCtrl',
 							LeftControl = 'LeftCtrl',
 							LeftShift = 'LShift',
@@ -1686,12 +1641,12 @@ function library:AddWindow(title, options)
 								objects.CanvasSize = UDim2.new(0, 0, (#objects:GetChildren() - 1) * 0.1, 0)
 							end
 
-							if open then -- Open
+							if open then
 								if dropdown_open then return end
 								dropdown_open = true
 								Resize(box, {Size = UDim2.new(1, 0, 0, len)}, options.tween_time)
 								Resize(indicator, {Rotation = 90}, options.tween_time)
-							else -- Close
+							else
 								dropdown_open = false
 								Resize(box, {Size = UDim2.new(1, 0, 0, 0)}, options.tween_time)
 								Resize(indicator, {Rotation = -90}, options.tween_time)
@@ -1851,7 +1806,7 @@ function library:AddWindow(title, options)
 						sample.ZIndex = sample.ZIndex + (windows * 10)
 						saturation.ZIndex = saturation.ZIndex + (windows * 10)
 
-						do -- Color Picker Math
+						do
 							local h = 0
 							local s = 1
 							local v = 1
@@ -1871,15 +1826,19 @@ function library:AddWindow(title, options)
 
 							local Entered1, Entered2 = false, false
 							palette.MouseEnter:Connect(function()
+								Window.Draggable = false
 								Entered1 = true
 							end)
 							palette.MouseLeave:Connect(function()
+								Window.Draggable = true
 								Entered1 = false
 							end)
 							saturation.MouseEnter:Connect(function()
+								Window.Draggable = false
 								Entered2 = true
 							end)
 							saturation.MouseLeave:Connect(function()
+								Window.Draggable = true
 								Entered2 = false
 							end)
 
@@ -1893,8 +1852,8 @@ function library:AddWindow(title, options)
 								if inputObject.UserInputType == Enum.UserInputType.MouseButton1 then
 									Held = true
 
-									spawn(function() -- Loop check
-										while Held and Entered1 and (not dropdown_open) do -- Palette
+									spawn(function()
+										while Held and Entered1 and (not dropdown_open) do
 											local mouse_location = gMouse()
 
 											local x = ((palette.AbsoluteSize.X - (mouse_location.X - palette.AbsolutePosition.X)) + 1)
@@ -1910,7 +1869,7 @@ function library:AddWindow(title, options)
 											RS.Heartbeat:Wait()
 										end
 
-										while Held and Entered2 and (not dropdown_open) do -- Saturation
+										while Held and Entered2 and (not dropdown_open) do
 											local mouse_location = gMouse()
 											local y = ((palette.AbsoluteSize.Y - (mouse_location.Y - palette.AbsolutePosition.Y)) + 1.5)
 											v = y / 100
@@ -2273,7 +2232,7 @@ function library:AddWindow(title, options)
 						return ha_data, ha
 					end
 
-					function tab_data:AddFolder(folder_name) -- [Folder]
+					function tab_data:AddFolder(folder_name)
 						local folder_data = {}
 
 						folder_name = tostring(folder_name or "New Folder")
@@ -2312,9 +2271,9 @@ function library:AddWindow(title, options)
 
 						local open = false
 						button.MouseButton1Click:Connect(function()
-							if open then -- Close
+							if open then
 								objects.Visible = false
-							else -- Open
+							else
 								objects.Visible = true
 							end
 
