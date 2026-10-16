@@ -966,7 +966,7 @@ local function hasprop(object, prop)
 end
 
 local function gNameLen(obj)
-	return math.max(obj.TextBounds.X + 20, 50)
+	return math.max(obj.TextBounds.X + 24, 60)
 end
 
 local function gMouse()
@@ -1286,10 +1286,12 @@ function library:AddWindow(title, options)
 
 				local new_button = prefabs:FindFirstChild("TabButton"):Clone()
 				new_button.Text = tab_name
+				new_button.Parent = tab_buttons -- Asignar primero al padre para que calcule las propiedades de texto correctamente
 				new_button.Size = UDim2.new(0, gNameLen(new_button), 0, 20)
 				new_button.ZIndex = new_button.ZIndex + (windows * 10)
-				new_button:GetChildren()[1].ZIndex = new_button:GetChildren()[1].ZIndex + (windows * 10)
-				new_button.Parent = tab_buttons
+				if new_button:GetChildren()[1] then
+					new_button:GetChildren()[1].ZIndex = new_button:GetChildren()[1].ZIndex + (windows * 10)
+				end
 
 				local new_tab = prefabs:FindFirstChild("Tab"):Clone()
 				new_tab.Parent = tabs
@@ -1299,7 +1301,9 @@ function library:AddWindow(title, options)
 					if dropdown_open then return end
 					for i, v in pairs(tab_buttons:GetChildren()) do
 						if not (v:IsA("UIListLayout")) then
-							v:GetChildren()[1].ImageColor3 = Color3.fromRGB(52, 53, 56)
+							if v:GetChildren()[1] then
+								v:GetChildren()[1].ImageColor3 = Color3.fromRGB(52, 53, 56)
+							end
 							Resize(v, {Size = UDim2.new(0, v.AbsoluteSize.X, 0, 20)}, options.tween_time)
 						end
 					end
@@ -1308,7 +1312,9 @@ function library:AddWindow(title, options)
 					end
 
 					Resize(new_button, {Size = UDim2.new(0, new_button.AbsoluteSize.X, 0, 25)}, options.tween_time)
-					new_button:GetChildren()[1].ImageColor3 = Color3.fromRGB(73, 75, 79)
+					if new_button:GetChildren()[1] then
+						new_button:GetChildren()[1].ImageColor3 = Color3.fromRGB(73, 75, 79)
+					end
 					new_tab.Visible = true
 				end
 
@@ -1478,37 +1484,35 @@ function library:AddWindow(title, options)
 									Held = true
 
 									spawn(function()
-										if Entered and not slider_options.readonly then
-											while Held and (not dropdown_open) do
-												local mouse_location = gMouse()
-												local x = (slider.AbsoluteSize.X - (slider.AbsoluteSize.X - ((mouse_location.X - slider.AbsolutePosition.X)) + 1)) / slider.AbsoluteSize.X
+										while Held and Entered and (not dropdown_open) do
+											local mouse_location = gMouse()
+											local x = (slider.AbsoluteSize.X - (slider.AbsoluteSize.X - ((mouse_location.X - slider.AbsolutePosition.X)) + 1)) / slider.AbsoluteSize.X
 
-												local min = 0
-												local max = 1
+											local min = 0
+											local max = 1
 
-												local size = min
-												if x >= min and x <= max then
-													size = x
-												elseif x < min then
-													size = min
-												elseif x > max then
-													size = max
-												end
-
-												Resize(indicator, {Size = UDim2.new(size or min, 0, 0, 20)}, options.tween_time)
-												local p = math.floor((size or min) * 100)
-
-												local maxv = slider_options.max
-												local minv = slider_options.min
-												local diff = maxv - minv
-
-												local sel_value = math.floor(((diff / 100) * p) + minv)
-
-												value.Text = tostring(sel_value)
-												pcall(callback, sel_value)
-
-												RS.Heartbeat:Wait()
+											local size = min
+											if x >= min and x <= max then
+												size = x
+											elseif x < min then
+												size = min
+											elseif x > max then
+												size = max
 											end
+
+											Resize(indicator, {Size = UDim2.new(size or min, 0, 0, 20)}, options.tween_time)
+											local p = math.floor((size or min) * 100)
+
+											local maxv = slider_options.max
+											local minv = slider_options.min
+											local diff = maxv - minv
+
+											local sel_value = math.floor(((diff / 100) * p) + minv)
+
+											value.Text = tostring(sel_value)
+											pcall(callback, sel_value)
+
+											RS.Heartbeat:Wait()
 										end
 									end)
 								end
