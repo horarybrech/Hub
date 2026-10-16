@@ -247,7 +247,7 @@ tabButtons.Size = UDim2.new(1, 0, 1, 0)
 uiListLayout.Parent = tabButtons
 uiListLayout.FillDirection = Enum.FillDirection.Horizontal
 uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-uiListLayout.Padding = UDim.new(0, 2)
+uiListLayout.Padding = UDim.new(0, 4)
 
 frame.Parent = tabSelection
 frame.BackgroundColor3 = Color3.new(0.12549, 0.227451, 0.372549)
@@ -966,7 +966,7 @@ local function hasprop(object, prop)
 end
 
 local function gNameLen(obj)
-	return math.max(obj.TextBounds.X + 24, 60)
+	return math.max(obj.TextBounds.X + 28, 75)
 end
 
 local function gMouse()
@@ -1286,8 +1286,15 @@ function library:AddWindow(title, options)
 
 				local new_button = prefabs:FindFirstChild("TabButton"):Clone()
 				new_button.Text = tab_name
-				new_button.Parent = tab_buttons -- Asignar primero al padre para que calcule las propiedades de texto correctamente
-				new_button.Size = UDim2.new(0, gNameLen(new_button), 0, 20)
+				new_button.Parent = tab_buttons 
+				
+				-- Forzar un cálculo seguro del ancho con base al texto real
+				task.defer(function()
+					if new_button and new_button.Parent then
+						new_button.Size = UDim2.new(0, gNameLen(new_button), 0, 20)
+					end
+				end)
+
 				new_button.ZIndex = new_button.ZIndex + (windows * 10)
 				if new_button:GetChildren()[1] then
 					new_button:GetChildren()[1].ZIndex = new_button:GetChildren()[1].ZIndex + (windows * 10)
@@ -1484,35 +1491,37 @@ function library:AddWindow(title, options)
 									Held = true
 
 									spawn(function()
-										while Held and Entered and (not dropdown_open) do
-											local mouse_location = gMouse()
-											local x = (slider.AbsoluteSize.X - (slider.AbsoluteSize.X - ((mouse_location.X - slider.AbsolutePosition.X)) + 1)) / slider.AbsoluteSize.X
+										if Entered and not slider_options.readonly then
+											while Held and (not dropdown_open) do
+												local mouse_location = gMouse()
+												local x = (slider.AbsoluteSize.X - (slider.AbsoluteSize.X - ((mouse_location.X - slider.AbsolutePosition.X)) + 1)) / slider.AbsoluteSize.X
 
-											local min = 0
-											local max = 1
+												local min = 0
+												local max = 1
 
-											local size = min
-											if x >= min and x <= max then
-												size = x
-											elseif x < min then
-												size = min
-											elseif x > max then
-												size = max
+												local size = min
+												if x >= min and x <= max then
+													size = x
+												elseif x < min then
+													size = min
+												elseif x > max then
+													size = max
+												end
+
+												Resize(indicator, {Size = UDim2.new(size or min, 0, 0, 20)}, options.tween_time)
+												local p = math.floor((size or min) * 100)
+
+												local maxv = slider_options.max
+												local minv = slider_options.min
+												local diff = maxv - minv
+
+												local sel_value = math.floor(((diff / 100) * p) + minv)
+
+												value.Text = tostring(sel_value)
+												pcall(callback, sel_value)
+
+												RS.Heartbeat:Wait()
 											end
-
-											Resize(indicator, {Size = UDim2.new(size or min, 0, 0, 20)}, options.tween_time)
-											local p = math.floor((size or min) * 100)
-
-											local maxv = slider_options.max
-											local minv = slider_options.min
-											local diff = maxv - minv
-
-											local sel_value = math.floor(((diff / 100) * p) + minv)
-
-											value.Text = tostring(sel_value)
-											pcall(callback, sel_value)
-
-											RS.Heartbeat:Wait()
 										end
 									end)
 								end
@@ -1565,7 +1574,7 @@ function library:AddWindow(title, options)
 						title.ZIndex = title.ZIndex + (windows * 10)
 
 						keybind.Parent = new_tab
-						title.Text = "  " .. keybind_name
+						title.Text = "  " + keybind_name
 						keybind.Size = UDim2.new(0, gNameLen(title) + 80, 0, 20)
 
 						local shortkeys = {
