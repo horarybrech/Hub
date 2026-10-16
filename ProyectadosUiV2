@@ -895,7 +895,7 @@ toggleGuiBtn.MouseButton1Click:Connect(function()
 				v.Visible = windowsFrame.Visible
 			end
 		end
-		toggleGuiBtn.Text = windowsFrame.Visible and "📽️" or "✖"
+		toggleGuiBtn.Text = windowsFrame.Visible and "👁" or "✖"
 		toggleGuiBtn.BackgroundColor3 = windowsFrame.Visible and ui_options.main_color or Color3.fromRGB(150, 50, 50)
 	end
 end)
@@ -910,7 +910,7 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
 						v.Visible = windowsFrame.Visible
 					end
 				end
-				toggleGuiBtn.Text = windowsFrame.Visible and "📽️" or "✖"
+				toggleGuiBtn.Text = windowsFrame.Visible and "👁" or "✖"
 				toggleGuiBtn.BackgroundColor3 = windowsFrame.Visible and ui_options.main_color or Color3.fromRGB(150, 50, 50)
 			end
 		end
@@ -2256,7 +2256,7 @@ function library:AddWindow(title, options)
 						end)
 
 						local function gFolderLen()
-							val n = 25
+							local n = 25
 							for i,v in pairs(objects:GetChildren()) do
 								if not (v:IsA("UIListLayout")) then
 									n = n + v.AbsoluteSize.Y + 5
