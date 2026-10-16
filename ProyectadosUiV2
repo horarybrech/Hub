@@ -19,6 +19,10 @@ do
 			if existing then
 				pcall(function() existing:Destroy() end)
 			end
+			local existingToggle = parent:FindFirstChild("imgui_toggle")
+			if existingToggle then
+				pcall(function() existingToggle:Destroy() end)
+			end
 		end
 	end
 
@@ -37,7 +41,7 @@ do
 	end
 
 	for _,v in pairs(game:GetDescendants()) do
-		if v.Name == "imgui" and v:IsA("ScreenGui") then
+		if (v.Name == "imgui" or v.Name == "imgui_toggle") and v:IsA("ScreenGui") then
 			pcall(function() v:Destroy() end)
 		end
 	end
@@ -122,6 +126,8 @@ local CoreGui= cloneref(game:GetService("CoreGui"))
 imgui.Name = "imgui"
 imgui.Parent = gethui and gethui() or (CoreGui or game.Players.LocalPlayer:WaitForChild("PlayerGui"))
 imgui.IgnoreGuiInset = true
+imgui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
 prefabs.Name = "Prefabs"
 prefabs.Parent = imgui
 prefabs.BackgroundColor3 = Color3.new(1, 1, 1)
@@ -865,7 +871,7 @@ local checks = {
 	["binding"] = false,
 }
 
--- Contenedor independiente y flotante para el botón de ocultar que siempre permanece visible y clickeable
+-- Contenedor independiente y flotante para el botón de ocultar
 local toggleGuiHolder = Instance.new("ScreenGui")
 toggleGuiHolder.Name = "imgui_toggle"
 toggleGuiHolder.Parent = gethui and gethui() or (CoreGui or p:WaitForChild("PlayerGui"))
@@ -879,7 +885,7 @@ toggleGuiBtn.Size = UDim2.new(0, 40, 0, 40)
 toggleGuiBtn.Position = UDim2.new(0, 15, 0, 50)
 toggleGuiBtn.BackgroundColor3 = ui_options.main_color
 toggleGuiBtn.BorderSizePixel = 0
-toggleGuiBtn.Text = "👁"
+toggleGuiBtn.Text = "📽️"
 toggleGuiBtn.TextColor3 = Color3.new(1, 1, 1)
 toggleGuiBtn.TextSize = 20
 toggleGuiBtn.Font = Enum.Font.GothamBold
