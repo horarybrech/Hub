@@ -849,7 +849,7 @@ windowsFrame.Position = UDim2.new(0, 20, 0, 20)
 windowsFrame.Size = UDim2.new(1, 20, 1, -20)
 windowsFrame.Visible = true
 
--- Botón flotante integrado dentro del mismo ScreenGui para conservar la escala y visibilidad exacta
+-- Botón flotante integrado dentro del mismo ScreenGui con clics garantizados en PC y móvil
 local toggleGuiBtn = Instance.new("TextButton")
 toggleGuiBtn.Name = "ToggleGui"
 toggleGuiBtn.Parent = imgui
@@ -857,7 +857,7 @@ toggleGuiBtn.Size = UDim2.new(0, 40, 0, 40)
 toggleGuiBtn.Position = UDim2.new(0, 15, 0, 50)
 toggleGuiBtn.BackgroundColor3 = ui_options.main_color
 toggleGuiBtn.BorderSizePixel = 0
-toggleGuiBtn.Text = "📽️"
+toggleGuiBtn.Text = "👁"
 toggleGuiBtn.TextColor3 = Color3.new(1, 1, 1)
 toggleGuiBtn.TextSize = 20
 toggleGuiBtn.Font = Enum.Font.GothamBold
@@ -895,7 +895,7 @@ toggleGuiBtn.MouseButton1Click:Connect(function()
 				v.Visible = windowsFrame.Visible
 			end
 		end
-		toggleGuiBtn.Text = windowsFrame.Visible and "👁" or "✖"
+		toggleGuiBtn.Text = windowsFrame.Visible and "📽️" or "✖"
 		toggleGuiBtn.BackgroundColor3 = windowsFrame.Visible and ui_options.main_color or Color3.fromRGB(150, 50, 50)
 	end
 end)
@@ -910,7 +910,7 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
 						v.Visible = windowsFrame.Visible
 					end
 				end
-				toggleGuiBtn.Text = windowsFrame.Visible and "👁" or "✖"
+				toggleGuiBtn.Text = windowsFrame.Visible and "📽️" or "✖"
 				toggleGuiBtn.BackgroundColor3 = windowsFrame.Visible and ui_options.main_color or Color3.fromRGB(150, 50, 50)
 			end
 		end
@@ -966,7 +966,7 @@ local function hasprop(object, prop)
 end
 
 local function gNameLen(obj)
-	return obj.TextBounds.X + 15
+	return math.max(obj.TextBounds.X + 20, 50)
 end
 
 local function gMouse()
@@ -1285,11 +1285,11 @@ function library:AddWindow(title, options)
 				tab_selection.Visible = true
 
 				local new_button = prefabs:FindFirstChild("TabButton"):Clone()
-				new_button.Parent = tab_buttons
 				new_button.Text = tab_name
 				new_button.Size = UDim2.new(0, gNameLen(new_button), 0, 20)
 				new_button.ZIndex = new_button.ZIndex + (windows * 10)
 				new_button:GetChildren()[1].ZIndex = new_button:GetChildren()[1].ZIndex + (windows * 10)
+				new_button.Parent = tab_buttons
 
 				local new_tab = prefabs:FindFirstChild("Tab"):Clone()
 				new_tab.Parent = tabs
@@ -2256,7 +2256,7 @@ function library:AddWindow(title, options)
 						end)
 
 						local function gFolderLen()
-							local n = 25
+							val n = 25
 							for i,v in pairs(objects:GetChildren()) do
 								if not (v:IsA("UIListLayout")) then
 									n = n + v.AbsoluteSize.Y + 5
