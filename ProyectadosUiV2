@@ -121,6 +121,7 @@ local CoreGui= cloneref(game:GetService("CoreGui"))
 
 imgui.Name = "imgui"
 imgui.Parent = gethui and gethui() or (CoreGui or game.Players.LocalPlayer:WaitForChild("PlayerGui"))
+imgui.IgnoreGuiInset = true
 prefabs.Name = "Prefabs"
 prefabs.Parent = imgui
 prefabs.BackgroundColor3 = Color3.new(1, 1, 1)
@@ -864,10 +865,16 @@ local checks = {
 	["binding"] = false,
 }
 
--- Botón flotante independiente para ocultar/mostrar UI
+-- Contenedor independiente y flotante para el botón de ocultar que siempre permanece visible y clickeable
+local toggleGuiHolder = Instance.new("ScreenGui")
+toggleGuiHolder.Name = "imgui_toggle"
+toggleGuiHolder.Parent = gethui and gethui() or (CoreGui or p:WaitForChild("PlayerGui"))
+toggleGuiHolder.IgnoreGuiInset = true
+toggleGuiHolder.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
 local toggleGuiBtn = Instance.new("TextButton")
 toggleGuiBtn.Name = "ToggleGui"
-toggleGuiBtn.Parent = imgui
+toggleGuiBtn.Parent = toggleGuiHolder
 toggleGuiBtn.Size = UDim2.new(0, 40, 0, 40)
 toggleGuiBtn.Position = UDim2.new(0, 15, 0, 50)
 toggleGuiBtn.BackgroundColor3 = ui_options.main_color
@@ -876,24 +883,19 @@ toggleGuiBtn.Text = "👁"
 toggleGuiBtn.TextColor3 = Color3.new(1, 1, 1)
 toggleGuiBtn.TextSize = 20
 toggleGuiBtn.Font = Enum.Font.GothamBold
-toggleGuiBtn.ZIndex = 9999
+toggleGuiBtn.Active = true
+toggleGuiBtn.Draggable = true
+toggleGuiBtn.ZIndex = 99999
 
 local toggleCornerBtn = Instance.new("UICorner")
 toggleCornerBtn.CornerRadius = UDim.new(1, 0)
 toggleCornerBtn.Parent = toggleGuiBtn
 
-local uiVisible = true
 toggleGuiBtn.MouseButton1Click:Connect(function()
 	if not checks.binding then
-		uiVisible = not uiVisible
-		windowsFrame.Visible = uiVisible
-		for _, child in ipairs(windowsFrame:GetChildren()) do
-			if child:IsA("ImageLabel") then
-				child.Visible = uiVisible
-			end
-		end
-		toggleGuiBtn.Text = uiVisible and "👁" or "✖"
-		toggleGuiBtn.BackgroundColor3 = uiVisible and ui_options.main_color or Color3.fromRGB(150, 50, 50)
+		root.Enabled = not root.Enabled
+		toggleGuiBtn.Text = root.Enabled and "👁" or "✖"
+		toggleGuiBtn.BackgroundColor3 = root.Enabled and ui_options.main_color or Color3.fromRGB(150, 50, 50)
 	end
 end)
 
@@ -901,15 +903,9 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
 	if input.KeyCode == ((typeof(ui_options.toggle_key) == "EnumItem") and ui_options.toggle_key or Enum.KeyCode.RightShift) then
 		if root then
 			if not checks.binding then
-				uiVisible = not uiVisible
-				windowsFrame.Visible = uiVisible
-				for _, child in ipairs(windowsFrame:GetChildren()) do
-					if child:IsA("ImageLabel") then
-						child.Visible = uiVisible
-					end
-				end
-				toggleGuiBtn.Text = uiVisible and "👁" or "✖"
-				toggleGuiBtn.BackgroundColor3 = uiVisible and ui_options.main_color or Color3.fromRGB(150, 50, 50)
+				root.Enabled = not root.Enabled
+				toggleGuiBtn.Text = root.Enabled and "👁" or "✖"
+				toggleGuiBtn.BackgroundColor3 = root.Enabled and ui_options.main_color or Color3.fromRGB(150, 50, 50)
 			end
 		end
 	end
