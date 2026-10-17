@@ -98,6 +98,10 @@ do
 			if existing then
 				pcall(function() existing:Destroy() end)
 			end
+            local toggleExist = parent:FindFirstChild("ToggleUI")
+            if toggleExist then
+                pcall(function() toggleExist:Destroy() end)
+            end
 		end
 	end
 
@@ -119,7 +123,7 @@ do
 
 	if not isSolara then
 		for _,v in pairs(game:GetDescendants()) do
-			if v.Name == "imgui" and v:IsA("ScreenGui") then
+			if (v.Name == "imgui" or v.Name == "ToggleUI") and v:IsA("ScreenGui") then
 				pcall(function() v:Destroy() end)
 			end
 		end
@@ -134,7 +138,7 @@ local label = Instance.new("TextLabel")
 local window = Instance.new("ImageLabel")
 local resizer = Instance.new("Frame")
 local bar = Instance.new("Frame")
-local toggle = Instance.new("TextButton") -- Convertido a TextButton para los emojis
+local toggle = Instance.new("TextButton")
 local base = Instance.new("ImageLabel")
 local top = Instance.new("ImageLabel")
 local tabs = Instance.new("Frame")
@@ -259,7 +263,6 @@ bar.BorderSizePixel = 0
 bar.Position = UDim2.new(0, 0, 0, 5)
 bar.Size = UDim2.new(1, 0, 0, 15)
 
--- BOTON PARA MINIMIZAR LA UI ACTUALIZADO
 toggle.Name = "Toggle"
 toggle.Parent = bar
 toggle.BackgroundColor3 = Color3.new(1, 1, 1)
@@ -268,7 +271,7 @@ toggle.Position = UDim2.new(0, 5, 0, 2)
 toggle.Size = UDim2.new(0, 20, 0, 20)
 toggle.ZIndex = 2
 toggle.Font = Enum.Font.GothamBold
-toggle.Text = "📽️" -- Texto por defecto al iniciar
+toggle.Text = "📽️"
 toggle.TextColor3 = Color3.new(1, 1, 1)
 toggle.TextSize = 14
 
@@ -956,6 +959,7 @@ local checks = {
 	["binding"] = false,
 }
 
+-- MANTENER BOTÓN DE PC ORIGINAL (RightShift)
 runtime:Connect(UIS.InputBegan, function(input, gameProcessed)
 	if input.KeyCode == ((typeof(ui_options.toggle_key) == "EnumItem") and ui_options.toggle_key or Enum.KeyCode.RightShift) then
 		if root then
@@ -965,6 +969,84 @@ runtime:Connect(UIS.InputBegan, function(input, gameProcessed)
 		end
 	end
 end)
+
+-- NUEVO: BOTÓN FLOTANTE APARTE PARA ABRIR/CERRAR LA UI (Soporte PC y Móvil)
+local toggleGui = Instance.new("ScreenGui")
+toggleGui.Name = "ToggleUI"
+toggleGui.ResetOnSpawn = false
+if not isSolara and type(gethui) == "function" then
+    pcall(function() toggleGui.Parent = gethui() end)
+end
+if not toggleGui.Parent and CoreGui then pcall(function() toggleGui.Parent = CoreGui end) end
+if not toggleGui.Parent then toggleGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui") end
+
+runtime:AddCleanup(function() toggleGui:Destroy() end)
+
+local floatingBtn = Instance.new("TextButton")
+floatingBtn.Name = "OpenCloseBtn"
+floatingBtn.Parent = toggleGui
+floatingBtn.BackgroundColor3 = ui_options.main_color
+floatingBtn.Position = UDim2.new(0.5, -22, 0, 10)
+floatingBtn.Size = UDim2.new(0, 45, 0, 45)
+floatingBtn.Font = Enum.Font.GothamBold
+floatingBtn.Text = "⚙️"
+floatingBtn.TextSize = 22
+floatingBtn.TextColor3 = Color3.new(1, 1, 1)
+floatingBtn.ZIndex = 100
+
+local floatingCorner = Instance.new("UICorner")
+floatingCorner.CornerRadius = UDim.new(0.5, 0)
+floatingCorner.Parent = floatingBtn
+
+local isDragging = false
+local dragStart = nil
+local startPos = nil
+local hasMoved = false
+
+floatingBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDragging = true
+        hasMoved = false
+        dragStart = input.Position
+        startPos = floatingBtn.Position
+        
+        local connection
+        connection = input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                isDragging = false
+                connection:Disconnect()
+            end
+        end)
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and isDragging then
+        if dragStart then
+            local delta = input.Position - dragStart
+            -- Si se mueve más de 5 píxeles, se considera arrastre y no clic
+            if math.abs(delta.X) > 5 or math.abs(delta.Y) > 5 then
+                hasMoved = true
+                floatingBtn.Position = UDim2.new(
+                    startPos.X.Scale, startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                )
+            end
+        end
+    end
+end)
+
+floatingBtn.MouseButton1Click:Connect(function()
+    -- Si no se arrastró, entonces actuamos como un botón de clic
+    if not hasMoved then
+        if root then
+            if not checks.binding and root.Enabled ~= nil then
+                root.Enabled = not root.Enabled
+            end
+        end
+    end
+end)
+-- FIN DEL BOTÓN FLOTANTE
 
 local function Resize(part, new, _delay)
 	_delay = _delay or 0.5
@@ -1329,7 +1411,6 @@ function library:AddWindow(title, options)
 		local oldwindowdata = {}
 		local oldy = Window.AbsoluteSize.Y
 		
-		-- LÓGICA DE MINIMIZAR LA UI ACTUALIZADA CON EMOJIS
 		runtime:Connect(open_close.MouseButton1Click, function()
 			if canopen then
 				canopen = false
@@ -1348,7 +1429,7 @@ function library:AddWindow(title, options)
 					Resize(Window, {Size = UDim2.new(0, Window.AbsoluteSize.X, 0, 26)}, options.tween_time)
 					open_close.Parent:FindFirstChild("Base").Transparency = 1
 					
-					open_close.Text = "❤️‍🔥" -- Emoji de interfaz cerrada (minimizada)
+					open_close.Text = "❤️‍🔥" 
 
 				else
 
@@ -1361,7 +1442,7 @@ function library:AddWindow(title, options)
 					Resize(Window, {Size = UDim2.new(0, Window.AbsoluteSize.X, 0, oldy)}, options.tween_time)
 					open_close.Parent:FindFirstChild("Base").Transparency = 0
 					
-					open_close.Text = "📽️" -- Emoji de interfaz abierta (maximizada)
+					open_close.Text = "📽️" 
 
 				end
 
