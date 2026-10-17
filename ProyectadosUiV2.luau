@@ -134,7 +134,7 @@ local label = Instance.new("TextLabel")
 local window = Instance.new("ImageLabel")
 local resizer = Instance.new("Frame")
 local bar = Instance.new("Frame")
-local toggle = Instance.new("ImageButton")
+local toggle = Instance.new("TextButton") -- Convertido a TextButton para los emojis
 local base = Instance.new("ImageLabel")
 local top = Instance.new("ImageLabel")
 local tabs = Instance.new("Frame")
@@ -259,15 +259,18 @@ bar.BorderSizePixel = 0
 bar.Position = UDim2.new(0, 0, 0, 5)
 bar.Size = UDim2.new(1, 0, 0, 15)
 
+-- BOTON PARA MINIMIZAR LA UI ACTUALIZADO
 toggle.Name = "Toggle"
 toggle.Parent = bar
 toggle.BackgroundColor3 = Color3.new(1, 1, 1)
 toggle.BackgroundTransparency = 1
-toggle.Position = UDim2.new(0, 5, 0, -2)
-toggle.Rotation = 0
+toggle.Position = UDim2.new(0, 5, 0, 2)
 toggle.Size = UDim2.new(0, 20, 0, 20)
 toggle.ZIndex = 2
-toggle.Image = "https://www.roblox.com/Thumbs/Asset.ashx?width=420&height=420&assetId=136171704230647"
+toggle.Font = Enum.Font.GothamBold
+toggle.Text = "📽️" -- Texto por defecto al iniciar
+toggle.TextColor3 = Color3.new(1, 1, 1)
+toggle.TextSize = 14
 
 local toggleCorner = Instance.new("UICorner")
 toggleCorner.CornerRadius = UDim.new(0.5, 0)
@@ -1325,6 +1328,8 @@ function library:AddWindow(title, options)
 
 		local oldwindowdata = {}
 		local oldy = Window.AbsoluteSize.Y
+		
+		-- LÓGICA DE MINIMIZAR LA UI ACTUALIZADA CON EMOJIS
 		runtime:Connect(open_close.MouseButton1Click, function()
 			if canopen then
 				canopen = false
@@ -1342,6 +1347,8 @@ function library:AddWindow(title, options)
 					oldy = Window.AbsoluteSize.Y
 					Resize(Window, {Size = UDim2.new(0, Window.AbsoluteSize.X, 0, 26)}, options.tween_time)
 					open_close.Parent:FindFirstChild("Base").Transparency = 1
+					
+					open_close.Text = "❤️‍🔥" -- Emoji de interfaz cerrada (minimizada)
 
 				else
 
@@ -1353,6 +1360,8 @@ function library:AddWindow(title, options)
 
 					Resize(Window, {Size = UDim2.new(0, Window.AbsoluteSize.X, 0, oldy)}, options.tween_time)
 					open_close.Parent:FindFirstChild("Base").Transparency = 0
+					
+					open_close.Text = "📽️" -- Emoji de interfaz abierta (maximizada)
 
 				end
 
