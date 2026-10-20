@@ -1,0 +1,697 @@
+local nativeTask = task
+local runtime = {Alive = true, Threads = {}, Connections = {}, Cleanups = {}}
+
+function runtime:Schedule(schedule, callback, ...)
+    if not self.Alive then return end
+    local arguments = table.pack(...)
+    local thread
+    thread = coroutine.create(function()
+        if not self.Alive then self.Threads[thread] = nil return end
+        local results = table.pack(pcall(callback, table.unpack(arguments, 1, arguments.n)))
+        self.Threads[thread] = nil
+        if not results[1] then error(results[2], 0) end
+        return table.unpack(results, 2, results.n)
+    end)
+    self.Threads[thread] = true
+    schedule(thread)
+    return thread
+end
+
+function runtime:Spawn(callback, ...) return self:Schedule(nativeTask.spawn, callback, ...) end
+function runtime:Defer(callback, ...) return self:Schedule(nativeTask.defer, callback, ...) end
+function runtime:Connect(signal, callback)
+    if not self.Alive then return end
+    local connection = signal:Connect(function(...) self:Spawn(callback, ...) end)
+    self.Connections[connection] = true
+    return connection
+end
+
+function runtime:AddCleanup(callback)
+    if self.Alive then table.insert(self.Cleanups, callback) else pcall(callback) end
+    return callback
+end
+
+function runtime:Destroy()
+    if not self.Alive then return end
+    self.Alive = false
+    for connection in pairs(self.Connections) do pcall(function() connection:Disconnect() end) end
+    table.clear(self.Connections)
+    local current = coroutine.running()
+    for thread in pairs(self.Threads) do
+        if thread ~= current and coroutine.status(thread) ~= "dead" then pcall(nativeTask.cancel, thread) end
+    end
+    table.clear(self.Threads)
+    for index = #self.Cleanups, 1, -1 do pcall(self.Cleanups[index]) end
+    table.clear(self.Cleanups)
+    if _G.SilenceRuntime == self then _G.SilenceRuntime = nil end
+end
+
+if _G.SilenceRuntime then _G.SilenceRuntime:Destroy() end
+_G.SilenceRuntime = runtime
+runtime.Threads[coroutine.running()] = true
+
+local isSolara = false
+do
+	local success, executorName = pcall(function()
+		local identify = identifyexecutor
+		if type(identify) ~= "function" then identify = getexecutorname end
+		if type(identify) == "function" then return identify() end
+	end)
+	isSolara = success and type(executorName) == "string" and string.lower(executorName) == "solara"
+end
+
+local ui_options = {
+	main_color = Color3.fromRGB(110, 50, 160),
+	min_size = Vector2.new(400, 300),
+	toggle_key = Enum.KeyCode.RightShift,
+	can_resize = true,
+}
+
+do
+	local function destroyImguiIn(parent)
+		if parent and parent.FindFirstChild then
+			local existing = parent:FindFirstChild("imgui")
+			if existing then pcall(function() existing:Destroy() end) end
+            local toggleExist = parent:FindFirstChild("ToggleUI")
+            if toggleExist then pcall(function() toggleExist:Destroy() end) end
+		end
+	end
+
+	if not isSolara then pcall(function() destroyImguiIn(game:GetService("CoreGui")) end) end
+	local Players = game:GetService("Players")
+	if Players and Players.LocalPlayer then destroyImguiIn(Players.LocalPlayer:FindFirstChild("PlayerGui")) end
+	if not isSolara and type(gethui) == "function" then
+		local ok, gh = pcall(gethui)
+		if ok and gh then destroyImguiIn(gh) end
+	end
+	if not isSolara then
+		for _,v in pairs(game:GetDescendants()) do
+			if (v.Name == "imgui" or v.Name == "ToggleUI") and v:IsA("ScreenGui") then pcall(function() v:Destroy() end) end
+		end
+	end
+end
+
+local imgui = Instance.new("ScreenGui")
+runtime:AddCleanup(function() imgui:Destroy() end)
+runtime:Connect(imgui.Destroying, function() runtime:Destroy() end)
+local prefabs = Instance.new("Frame")
+local window = Instance.new("ImageLabel")
+local resizer = Instance.new("Frame")
+local bar = Instance.new("Frame")
+local toggle = Instance.new("TextButton")
+local base = Instance.new("ImageLabel")
+local top = Instance.new("ImageLabel")
+local tabs = Instance.new("Frame")
+local titleLabel = Instance.new("TextLabel")
+local tabSelection = Instance.new("ImageLabel")
+local tabButtons = Instance.new("Frame")
+local uiListLayout = Instance.new("UIListLayout")
+local frame = Instance.new("Frame")
+local tab = Instance.new("Frame")
+local uiListLayout2 = Instance.new("UIListLayout")
+local slider = Instance.new("ImageLabel")
+local sliderTitle = Instance.new("TextLabel")
+local indicator = Instance.new("ImageLabel")
+local sliderValue = Instance.new("TextLabel")
+local circle = Instance.new("ImageLabel")
+local tabButton = Instance.new("TextButton")
+local textButtonRoundify4px_2 = Instance.new("ImageLabel")
+local button = Instance.new("TextButton")
+local textButtonRoundify4px_3 = Instance.new("ImageLabel")
+local switchButton = Instance.new("TextButton")
+local textButtonRoundify4px_4 = Instance.new("ImageLabel")
+local title3Label = Instance.new("TextLabel")
+local windowsFrame = Instance.new("Frame")
+local cloneref = type(cloneref) == "function" and cloneref or function(...) return ... end
+local CoreGui
+
+if not isSolara then pcall(function() CoreGui = game:GetService("CoreGui") end) end
+if CoreGui then pcall(function() CoreGui = cloneref(CoreGui) end) end
+
+imgui.Name = "imgui"
+imgui.ResetOnSpawn = false
+if not isSolara and type(gethui) == "function" then pcall(function() imgui.Parent = gethui() end) end
+if not imgui.Parent and CoreGui then pcall(function() imgui.Parent = CoreGui end) end
+if not imgui.Parent then imgui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui") end
+
+prefabs.Name = "Prefabs"
+prefabs.Parent = imgui
+prefabs.Visible = false
+
+window.Name = "Window"
+window.Parent = prefabs
+window.Active = true
+window.BackgroundTransparency = 1
+window.ClipsDescendants = true
+window.Position = UDim2.new(0, 20, 0, 20)
+window.Selectable = true
+window.Size = UDim2.new(0, 200, 0, 200)
+window.Image = "rbxassetid://2851926732"
+window.ImageColor3 = Color3.new(0.082, 0.086, 0.090)
+window.ScaleType = Enum.ScaleType.Slice
+window.SliceCenter = Rect.new(12, 12, 12, 12)
+
+resizer.Name = "Resizer"
+resizer.Parent = window
+resizer.Active = true
+resizer.BackgroundTransparency = 1
+resizer.Position = UDim2.new(1, -20, 1, -20)
+resizer.Size = UDim2.new(0, 20, 0, 20)
+
+bar.Name = "Bar"
+bar.Parent = window
+bar.BackgroundColor3 = Color3.fromRGB(110, 50, 160)
+bar.BorderSizePixel = 0
+bar.Position = UDim2.new(0, 0, 0, 5)
+bar.Size = UDim2.new(1, 0, 0, 15)
+
+toggle.Name = "Toggle"
+toggle.Parent = bar
+toggle.BackgroundTransparency = 1
+toggle.Position = UDim2.new(0, 5, 0, 2)
+toggle.Size = UDim2.new(0, 20, 0, 20)
+toggle.ZIndex = 2
+toggle.Font = Enum.Font.GothamBold
+toggle.Text = "📽️"
+toggle.TextColor3 = Color3.new(1, 1, 1)
+toggle.TextSize = 14
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(0.5, 0)
+toggleCorner.Parent = toggle
+
+base.Name = "Base"
+base.Parent = bar
+base.BackgroundColor3 = Color3.fromRGB(110, 50, 160)
+base.BorderSizePixel = 0
+base.Position = UDim2.new(0, 0, 0.8, 0)
+base.Size = UDim2.new(1, 0, 0, 10)
+base.Image = "rbxassetid://2851926732"
+base.ImageColor3 = Color3.fromRGB(110, 50, 160)
+base.ScaleType = Enum.ScaleType.Slice
+base.SliceCenter = Rect.new(12, 12, 12, 12)
+
+top.Name = "Top"
+top.Parent = bar
+top.BackgroundTransparency = 1
+top.Position = UDim2.new(0, 0, 0, -5)
+top.Size = UDim2.new(1, 0, 0, 10)
+top.Image = "rbxassetid://2851926732"
+top.ImageColor3 = Color3.fromRGB(110, 50, 160)
+top.ScaleType = Enum.ScaleType.Slice
+top.SliceCenter = Rect.new(12, 12, 12, 12)
+
+tabs.Name = "Tabs"
+tabs.Parent = window
+tabs.BackgroundTransparency = 1
+tabs.Position = UDim2.new(0, 15, 0, 60)
+tabs.Size = UDim2.new(1, -30, 1, -60)
+
+titleLabel.Name = "Title"
+titleLabel.Parent = window
+titleLabel.BackgroundTransparency = 1
+titleLabel.Position = UDim2.new(0, 30, 0, 3)
+titleLabel.Size = UDim2.new(0, 200, 0, 20)
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.Text = "Menu"
+titleLabel.TextColor3 = Color3.new(1, 1, 1)
+titleLabel.TextSize = 14
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+tabSelection.Name = "TabSelection"
+tabSelection.Parent = window
+tabSelection.BackgroundTransparency = 1
+tabSelection.Position = UDim2.new(0, 15, 0, 30)
+tabSelection.Size = UDim2.new(1, -30, 0, 25)
+tabSelection.Visible = false
+tabSelection.Image = "rbxassetid://2851929490"
+tabSelection.ImageColor3 = Color3.new(0.145, 0.149, 0.156)
+tabSelection.ScaleType = Enum.ScaleType.Slice
+tabSelection.SliceCenter = Rect.new(4, 4, 4, 4)
+
+tabButtons.Name = "TabButtons"
+tabButtons.Parent = tabSelection
+tabButtons.BackgroundTransparency = 1
+tabButtons.Size = UDim2.new(1, 0, 1, 0)
+
+uiListLayout.Parent = tabButtons
+uiListLayout.FillDirection = Enum.FillDirection.Horizontal
+uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+uiListLayout.Padding = UDim.new(0, 2)
+
+frame.Parent = tabSelection
+frame.BackgroundColor3 = Color3.new(0.125, 0.227, 0.372)
+frame.BorderSizePixel = 0
+frame.Position = UDim2.new(0, 0, 1, 0)
+frame.Size = UDim2.new(1, 0, 0, 2)
+
+tab.Name = "Tab"
+tab.Parent = prefabs
+tab.BackgroundTransparency = 1
+tab.Size = UDim2.new(1, 0, 1, 0)
+tab.Visible = false
+
+uiListLayout2.Parent = tab
+uiListLayout2.SortOrder = Enum.SortOrder.LayoutOrder
+uiListLayout2.Padding = UDim.new(0, 5)
+
+slider.Name = "Slider"
+slider.Parent = prefabs
+slider.BackgroundTransparency = 1
+slider.Size = UDim2.new(1, 0, 0, 20)
+slider.Image = "rbxassetid://2851929490"
+slider.ImageColor3 = Color3.new(0.145, 0.149, 0.156)
+slider.ScaleType = Enum.ScaleType.Slice
+slider.SliceCenter = Rect.new(4, 4, 4, 4)
+
+sliderTitle.Name = "Title"
+sliderTitle.Parent = slider
+sliderTitle.BackgroundTransparency = 1
+sliderTitle.Position = UDim2.new(0.5, 0, 0.5, -10)
+sliderTitle.Size = UDim2.new(0, 0, 0, 20)
+sliderTitle.ZIndex = 2
+sliderTitle.Font = Enum.Font.GothamSemibold
+sliderTitle.TextColor3 = Color3.new(0.784, 0.784, 0.784)
+sliderTitle.TextSize = 14
+
+indicator.Name = "Indicator"
+indicator.Parent = slider
+indicator.BackgroundTransparency = 1
+indicator.Size = UDim2.new(0, 0, 0, 20)
+indicator.Image = "rbxassetid://2851929490"
+indicator.ImageColor3 = Color3.new(0.254, 0.262, 0.278)
+indicator.ScaleType = Enum.ScaleType.Slice
+indicator.SliceCenter = Rect.new(4, 4, 4, 4)
+
+sliderValue.Name = "Value"
+sliderValue.Parent = slider
+sliderValue.BackgroundTransparency = 1
+sliderValue.Position = UDim2.new(1, -55, 0.5, -10)
+sliderValue.Size = UDim2.new(0, 50, 0, 20)
+sliderValue.Font = Enum.Font.GothamSemibold
+sliderValue.TextColor3 = Color3.new(0.784, 0.784, 0.784)
+sliderValue.TextSize = 14
+
+circle.Name = "Circle"
+circle.Parent = prefabs
+circle.BackgroundTransparency = 1
+circle.Image = "rbxassetid://266543268"
+circle.ImageTransparency = 0.5
+
+tabButton.Name = "TabButton"
+tabButton.Parent = prefabs
+tabButton.BackgroundColor3 = Color3.fromRGB(110, 50, 160)
+tabButton.BackgroundTransparency = 1
+tabButton.BorderSizePixel = 0
+tabButton.Size = UDim2.new(0, 71, 0, 20)
+tabButton.ZIndex = 2
+tabButton.Font = Enum.Font.GothamSemibold
+tabButton.TextColor3 = Color3.new(0.784, 0.784, 0.784)
+tabButton.TextSize = 14
+
+textButtonRoundify4px_2.Name = "TextButton_Roundify_4px"
+textButtonRoundify4px_2.Parent = tabButton
+textButtonRoundify4px_2.BackgroundTransparency = 1
+textButtonRoundify4px_2.Size = UDim2.new(1, 0, 1, 0)
+textButtonRoundify4px_2.Image = "rbxassetid://2851929490"
+textButtonRoundify4px_2.ImageColor3 = Color3.new(0.203, 0.207, 0.219)
+textButtonRoundify4px_2.ScaleType = Enum.ScaleType.Slice
+textButtonRoundify4px_2.SliceCenter = Rect.new(4, 4, 4, 4)
+
+button.Name = "Button"
+button.Parent = prefabs
+button.BackgroundColor3 = Color3.fromRGB(110, 50, 160)
+button.BackgroundTransparency = 1
+button.BorderSizePixel = 0
+button.Size = UDim2.new(0, 91, 0, 20)
+button.ZIndex = 2
+button.Font = Enum.Font.GothamSemibold
+button.TextColor3 = Color3.new(1, 1, 1)
+button.TextSize = 14
+
+textButtonRoundify4px_3.Name = "TextButton_Roundify_4px"
+textButtonRoundify4px_3.Parent = button
+textButtonRoundify4px_3.BackgroundTransparency = 1
+textButtonRoundify4px_3.Size = UDim2.new(1, 0, 1, 0)
+textButtonRoundify4px_3.Image = "rbxassetid://2851929490"
+textButtonRoundify4px_3.ImageColor3 = Color3.fromRGB(110, 50, 160)
+textButtonRoundify4px_3.ScaleType = Enum.ScaleType.Slice
+textButtonRoundify4px_3.SliceCenter = Rect.new(4, 4, 4, 4)
+
+switchButton.Name = "Switch"
+switchButton.Parent = prefabs
+switchButton.BackgroundTransparency = 1
+switchButton.BorderSizePixel = 0
+switchButton.Size = UDim2.new(0, 20, 0, 20)
+switchButton.ZIndex = 2
+switchButton.Font = Enum.Font.GothamSemibold
+switchButton.Text = ""
+switchButton.TextColor3 = Color3.new(1, 1, 1)
+switchButton.TextSize = 18
+
+textButtonRoundify4px_4.Name = "TextButton_Roundify_4px"
+textButtonRoundify4px_4.Parent = switchButton
+textButtonRoundify4px_4.BackgroundTransparency = 1
+textButtonRoundify4px_4.Size = UDim2.new(1, 0, 1, 0)
+textButtonRoundify4px_4.Image = "rbxassetid://2851929490"
+textButtonRoundify4px_4.ImageColor3 = Color3.fromRGB(110, 50, 160)
+textButtonRoundify4px_4.ImageTransparency = 0.5
+textButtonRoundify4px_4.ScaleType = Enum.ScaleType.Slice
+textButtonRoundify4px_4.SliceCenter = Rect.new(4, 4, 4, 4)
+
+title3Label.Name = "Title"
+title3Label.Parent = switchButton
+title3Label.BackgroundTransparency = 1
+title3Label.Position = UDim2.new(1.2, 0, 0, 0)
+title3Label.Size = UDim2.new(0, 20, 0, 20)
+title3Label.Font = Enum.Font.GothamBold
+title3Label.TextColor3 = Color3.new(0.784, 0.784, 0.784)
+title3Label.TextSize = 14
+title3Label.TextXAlignment = Enum.TextXAlignment.Left
+
+windowsFrame.Name = "Windows"
+windowsFrame.Parent = imgui
+windowsFrame.BackgroundTransparency = 1
+windowsFrame.Position = UDim2.new(0, 20, 0, 20)
+windowsFrame.Size = UDim2.new(1, 20, 1, -20)
+
+local root = imgui
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RS = game:GetService("RunService")
+local ps = game:GetService("Players")
+local p = ps.LocalPlayer
+local mouse = p:GetMouse()
+
+local checks = { binding = false }
+
+-- BOTON DE PC ORIGINAL (RightShift por defecto)
+runtime:Connect(UIS.InputBegan, function(input, gameProcessed)
+	if input.KeyCode == ((typeof(ui_options.toggle_key) == "EnumItem") and ui_options.toggle_key or Enum.KeyCode.RightShift) then
+		if root and not checks.binding and root.Enabled ~= nil then
+			root.Enabled = not root.Enabled
+		end
+	end
+end)
+
+-- BOTÓN FLOTANTE UNIVERSAL (Móvil y PC)
+local toggleGui = Instance.new("ScreenGui")
+toggleGui.Name = "ToggleUI"
+toggleGui.ResetOnSpawn = false
+if not isSolara and type(gethui) == "function" then pcall(function() toggleGui.Parent = gethui() end) end
+if not toggleGui.Parent and CoreGui then pcall(function() toggleGui.Parent = CoreGui end) end
+if not toggleGui.Parent then toggleGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui") end
+
+runtime:AddCleanup(function() toggleGui:Destroy() end)
+
+local floatingBtn = Instance.new("TextButton")
+floatingBtn.Name = "OpenCloseBtn"
+floatingBtn.Parent = toggleGui
+floatingBtn.BackgroundColor3 = ui_options.main_color
+floatingBtn.Position = UDim2.new(0.5, -22, 0, 10)
+floatingBtn.Size = UDim2.new(0, 45, 0, 45)
+floatingBtn.Font = Enum.Font.GothamBold
+floatingBtn.Text = "⚙️"
+floatingBtn.TextSize = 22
+floatingBtn.TextColor3 = Color3.new(1, 1, 1)
+floatingBtn.ZIndex = 100
+
+local floatingCorner = Instance.new("UICorner")
+floatingCorner.CornerRadius = UDim.new(0.5, 0)
+floatingCorner.Parent = floatingBtn
+
+local isDragging, dragStart, startPos, hasMoved = false, nil, nil, false
+
+floatingBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDragging = true
+        hasMoved = false
+        dragStart = input.Position
+        startPos = floatingBtn.Position
+        local connection
+        connection = input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                isDragging = false
+                connection:Disconnect()
+            end
+        end)
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and isDragging then
+        if dragStart then
+            local delta = input.Position - dragStart
+            if math.abs(delta.X) > 5 or math.abs(delta.Y) > 5 then
+                hasMoved = true
+                floatingBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end
+    end
+end)
+
+floatingBtn.MouseButton1Click:Connect(function()
+    if not hasMoved and root and not checks.binding and root.Enabled ~= nil then
+        root.Enabled = not root.Enabled
+    end
+end)
+
+local function Resize(part, new, _delay)
+	local tweenInfo = TweenInfo.new(_delay or 0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	TweenService:Create(part, tweenInfo, new):Play()
+end
+
+local function gNameLen(obj) return obj.TextBounds.X + 15 end
+local function gMouse() return Vector2.new(UIS:GetMouseLocation().X + 1, UIS:GetMouseLocation().Y - 35) end
+
+local function ripple(button, x, y)
+	runtime:Spawn(function()
+		button.ClipsDescendants = true
+		local circle = prefabs:FindFirstChild("Circle"):Clone()
+		circle.Parent = button
+		circle.ZIndex = 1000
+		circle.Position = UDim2.new(0, x - circle.AbsolutePosition.X, 0, y - circle.AbsolutePosition.Y)
+		local size = math.max(button.AbsoluteSize.X, button.AbsoluteSize.Y) * 1.5
+		circle:TweenSizeAndPosition(UDim2.new(0, size, 0, size), UDim2.new(0.5, -size / 2, 0.5, -size / 2), "Out", "Quad", 0.5, false, nil)
+		Resize(circle, {ImageTransparency = 1}, 0.5)
+		wait(0.5)
+		circle:Destroy()
+	end)
+end
+
+local windows = 0
+local library = {Runtime = runtime}
+
+function library:AddWindow(title, options)
+	if not runtime.Alive then return end
+	windows = windows + 1
+	options = (typeof(options) == "table") and options or ui_options
+	options.tween_time = 0.1
+
+	local Window = prefabs:FindFirstChild("Window"):Clone()
+	Window.Parent = windowsFrame
+	Window:FindFirstChild("Title").Text = tostring(title or "New Window")
+	Window.Size = UDim2.new(0, options.min_size.X, 0, options.min_size.Y)
+	Window.ZIndex = Window.ZIndex + (windows * 10)
+
+	local Title = Window:FindFirstChild("Title")
+	local Bar = Window:FindFirstChild("Bar")
+	local Base = Bar:FindFirstChild("Base")
+	local Top = Bar:FindFirstChild("Top")
+	local SplitFrame = Window:FindFirstChild("TabSelection"):FindFirstChild("Frame")
+
+	runtime:Spawn(function()
+		while true do
+			Bar.BackgroundColor3 = options.main_color
+			Base.BackgroundColor3 = options.main_color
+			Base.ImageColor3 = options.main_color
+			Top.ImageColor3 = options.main_color
+			SplitFrame.BackgroundColor3 = options.main_color
+			RS.Heartbeat:Wait()
+		end
+	end)
+
+	local Resizer = Window:WaitForChild("Resizer")
+	Window.Draggable = true
+
+	local window_data = {}
+	
+	local oldIcon, Entered = mouse.Icon, false
+	runtime:Connect(Resizer.MouseEnter, function()
+		Window.Draggable = false
+		if options.can_resize then oldIcon = mouse.Icon end
+		Entered = true
+	end)
+	runtime:Connect(Resizer.MouseLeave, function()
+		Entered = false
+		if options.can_resize then mouse.Icon = oldIcon end
+		Window.Draggable = true
+	end)
+
+	local Held = false
+	runtime:Connect(UIS.InputBegan, function(inputObject)
+		if inputObject.UserInputType == Enum.UserInputType.MouseButton1 then
+			Held = true
+			runtime:Spawn(function()
+				if Entered and Resizer.Active and options.can_resize then
+					while Held and Resizer.Active do
+						local mouse_loc = gMouse()
+						local x, y = mouse_loc.X - Window.AbsolutePosition.X, mouse_loc.Y - Window.AbsolutePosition.Y
+						x = math.max(x, options.min_size.X)
+						y = math.max(y, options.min_size.Y)
+						Resize(Window, {Size = UDim2.new(0, x, 0, y)}, options.tween_time)
+						RS.Heartbeat:Wait()
+					end
+				end
+			end)
+		end
+	end)
+	runtime:Connect(UIS.InputEnded, function(inputObject)
+		if inputObject.UserInputType == Enum.UserInputType.MouseButton1 then Held = false end
+	end)
+
+	local open_close = Bar:FindFirstChild("Toggle")
+	local open, canopen, oldy = true, true, Window.AbsoluteSize.Y
+	local oldwindowdata = {}
+	
+	runtime:Connect(open_close.MouseButton1Click, function()
+		if canopen then
+			canopen = false
+			if open then
+				oldwindowdata = {}
+				for i,v in pairs(Window:FindFirstChild("Tabs"):GetChildren()) do
+					oldwindowdata[v] = v.Visible
+					v.Visible = false
+				end
+				Resizer.Active = false
+				oldy = Window.AbsoluteSize.Y
+				Resize(Window, {Size = UDim2.new(0, Window.AbsoluteSize.X, 0, 26)}, options.tween_time)
+				open_close.Parent:FindFirstChild("Base").Transparency = 1
+				open_close.Text = "❤️‍🔥" 
+			else
+				for i,v in pairs(oldwindowdata) do i.Visible = v end
+				Resizer.Active = true
+				Resize(Window, {Size = UDim2.new(0, Window.AbsoluteSize.X, 0, oldy)}, options.tween_time)
+				open_close.Parent:FindFirstChild("Base").Transparency = 0
+				open_close.Text = "📽️" 
+			end
+			open = not open
+			wait(options.tween_time)
+			canopen = true
+		end
+	end)
+
+	local tabs = Window:FindFirstChild("Tabs")
+	local tab_selection = Window:FindFirstChild("TabSelection")
+	local tab_buttons = tab_selection:FindFirstChild("TabButtons")
+
+	function window_data:AddTab(tab_name)
+		local tab_data = {}
+		tab_selection.Visible = true
+
+		local new_button = prefabs:FindFirstChild("TabButton"):Clone()
+		new_button.Parent = tab_buttons
+		new_button.Text = tostring(tab_name or "New Tab")
+		new_button.Size = UDim2.new(0, gNameLen(new_button), 0, 20)
+		new_button.ZIndex = new_button.ZIndex + (windows * 10)
+
+		local new_tab = prefabs:FindFirstChild("Tab"):Clone()
+		new_tab.Parent = tabs
+		new_tab.ZIndex = new_tab.ZIndex + (windows * 10)
+
+		local function show()
+			for i, v in pairs(tab_buttons:GetChildren()) do
+				if not v:IsA("UIListLayout") then
+					v:GetChildren()[1].ImageColor3 = Color3.fromRGB(52, 53, 56)
+					Resize(v, {Size = UDim2.new(0, v.AbsoluteSize.X, 0, 20)}, options.tween_time)
+				end
+			end
+			for i, v in pairs(tabs:GetChildren()) do v.Visible = false end
+			Resize(new_button, {Size = UDim2.new(0, new_button.AbsoluteSize.X, 0, 25)}, options.tween_time)
+			new_button:GetChildren()[1].ImageColor3 = Color3.fromRGB(73, 75, 79)
+			new_tab.Visible = true
+		end
+
+		runtime:Connect(new_button.MouseButton1Click, show)
+		function tab_data:Show() show() end
+
+		function tab_data:AddButton(button_text, callback)
+			local btn = prefabs:FindFirstChild("Button"):Clone()
+			btn.Parent = new_tab
+			btn.Text = tostring(button_text or "Button")
+			btn.Size = UDim2.new(0, gNameLen(btn), 0, 20)
+			
+			runtime:Spawn(function()
+				while true do
+					if btn and btn:GetChildren()[1] then btn:GetChildren()[1].ImageColor3 = options.main_color end
+					RS.Heartbeat:Wait()
+				end
+			end)
+
+			runtime:Connect(btn.MouseButton1Click, function()
+				ripple(btn, mouse.X, mouse.Y)
+				pcall(callback or function() end)
+			end)
+			return btn
+		end
+
+		function tab_data:AddSwitch(switch_text, callback)
+			local switch = prefabs:FindFirstChild("Switch"):Clone()
+			switch.Parent = new_tab
+			switch:FindFirstChild("Title").Text = tostring(switch_text or "Switch")
+			
+			runtime:Spawn(function()
+				while true do
+					if switch and switch:GetChildren()[1] then switch:GetChildren()[1].ImageColor3 = options.main_color end
+					RS.Heartbeat:Wait()
+				end
+			end)
+
+			local toggled = false
+			runtime:Connect(switch.MouseButton1Click, function()
+				toggled = not toggled
+				switch.Text = toggled and utf8.char(10003) or ""
+				pcall(callback or function() end, toggled)
+			end)
+		end
+
+		function tab_data:AddSlider(slider_text, callback, slider_options)
+			local slider = prefabs:FindFirstChild("Slider"):Clone()
+			slider.Parent = new_tab
+			local title = slider:FindFirstChild("Title")
+			local indicator = slider:FindFirstChild("Indicator")
+			local value = slider:FindFirstChild("Value")
+			title.Text = tostring(slider_text or "Slider")
+			slider_options = slider_options or {min = 0, max = 100}
+
+			local Entered, Held = false, false
+			runtime:Connect(slider.MouseEnter, function() Entered, Window.Draggable = true, false end)
+			runtime:Connect(slider.MouseLeave, function() Entered, Window.Draggable = false, true end)
+			runtime:Connect(UIS.InputBegan, function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					Held = true
+					runtime:Spawn(function()
+						while Held and Entered do
+							local x = (slider.AbsoluteSize.X - (slider.AbsoluteSize.X - ((gMouse().X - slider.AbsolutePosition.X)) + 1)) / slider.AbsoluteSize.X
+							x = math.clamp(x, 0, 1)
+							Resize(indicator, {Size = UDim2.new(x, 0, 0, 20)}, options.tween_time)
+							local sel_value = math.floor(((slider_options.max - slider_options.min) * x) + slider_options.min)
+							value.Text = tostring(sel_value)
+							pcall(callback or function() end, sel_value)
+							RS.Heartbeat:Wait()
+						end
+					end)
+				end
+			end)
+			runtime:Connect(UIS.InputEnded, function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 then Held = false end
+			end)
+		end
+
+		return tab_data
+	end
+
+	return window_data
+end
+
+return library
