@@ -67,11 +67,11 @@ end
 
 local WHITE = Color3.new(1, 1, 1)
 local BLACK = Color3.new(0, 0, 0)
-local INK_OUTLINE = Color3.fromRGB(16, 14, 20)
+local INK_OUTLINE = Color3.fromRGB(16, 14, 22)
 local CLOSE_RED = Color3.fromRGB(224, 62, 58)
 local DEFAULT_TWEEN = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
--- Temas inspirados en las GUIs (sin Default Elirium, con emojis de Elirium en el tema morado)
+-- Temas (sin Default Elirium, con emojis de Elirium en el tema morado)
 local THEME_ORDER = {
 	"Morado Neón",
 	"Carmesí Imperial",
@@ -84,7 +84,7 @@ local THEME_ORDER = {
 
 local THEMES = {
 	["Morado Neón"] = {
-		main_color = Color3.fromRGB(168, 68, 224),
+		main_color = Color3.fromRGB(178, 72, 236),
 		bg_color = Color3.fromRGB(24, 18, 34),
 		surface_color = Color3.fromRGB(36, 26, 50),
 		bar_color = Color3.fromRGB(48, 34, 66),
@@ -212,6 +212,7 @@ local ui_options = {
 	min_size = Vector2.new(450, 320),
 	toggle_key = Enum.KeyCode.RightShift,
 	can_resize = true,
+	hud_button_text = "HUB",
 }
 
 local function shiftColor(c, delta)
@@ -478,7 +479,7 @@ runtime:Connect(UIS.InputBegan, function(input, gameProcessed)
 	end
 end)
 
--- Botón flotante estilo placa de juego para ocultar/mostrar la GUI
+-- Botón flotante integrado como botón lateral del juego (icono izquierda + etiqueta)
 local toggleGui = Instance.new("ScreenGui")
 toggleGui.Name = "ToggleUI"
 toggleGui.ResetOnSpawn = false
@@ -487,23 +488,25 @@ mountGui(toggleGui)
 runtime:AddCleanup(function() toggleGui:Destroy() end)
 
 local defaultThemeInfo = THEMES[DEFAULT_THEME_NAME]
-local btnSize = isCompactDevice() and 42 or 46
+local compactHud = isCompactDevice()
+local hudBtnW = compactHud and 98 or 112
+local hudBtnH = compactHud and 30 or 34
+
 local floatingBtn = Instance.new("TextButton")
 floatingBtn.Name = "OpenCloseBtn"
 floatingBtn.Parent = toggleGui
 floatingBtn.Active = true
-floatingBtn.BackgroundColor3 = defaultThemeInfo.surface_color
-floatingBtn.Position = UDim2.new(0.5, -math.floor(btnSize / 2), 0, 10)
-floatingBtn.Size = UDim2.new(0, btnSize, 0, btnSize)
-floatingBtn.Font = defaultThemeInfo.font_title
-floatingBtn.Text = defaultThemeInfo.gui_icon or "⚙️"
-floatingBtn.TextSize = isCompactDevice() and 18 or 20
-floatingBtn.TextColor3 = defaultThemeInfo.text_color
+floatingBtn.BackgroundColor3 = defaultThemeInfo.main_color
+floatingBtn.Position = UDim2.new(0, 14, 0.5, 110)
+floatingBtn.Size = UDim2.new(0, hudBtnW, 0, hudBtnH)
+floatingBtn.Font = Enum.Font.GothamBlack
+floatingBtn.Text = ""
+floatingBtn.TextColor3 = WHITE
 floatingBtn.AutoButtonColor = false
 floatingBtn.ZIndex = 100
 
 local floatingCorner = Instance.new("UICorner")
-floatingCorner.CornerRadius = UDim.new(1, 0)
+floatingCorner.CornerRadius = UDim.new(0, 8)
 floatingCorner.Parent = floatingBtn
 
 local floatingStroke = Instance.new("UIStroke")
@@ -511,6 +514,46 @@ floatingStroke.Color = INK_OUTLINE
 floatingStroke.Thickness = 2.2
 floatingStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 floatingStroke.Parent = floatingBtn
+
+local floatingIcon = Instance.new("TextLabel")
+floatingIcon.Name = "Icon"
+floatingIcon.Parent = floatingBtn
+floatingIcon.BackgroundTransparency = 1
+floatingIcon.Position = UDim2.new(0, 6, 0, 0)
+floatingIcon.Size = UDim2.new(0, 24, 1, 0)
+floatingIcon.Font = Enum.Font.GothamBlack
+floatingIcon.Text = defaultThemeInfo.gui_icon or "⚙️"
+floatingIcon.TextSize = compactHud and 15 or 17
+floatingIcon.TextColor3 = WHITE
+floatingIcon.ZIndex = 101
+
+local floatingLabel = Instance.new("TextLabel")
+floatingLabel.Name = "Label"
+floatingLabel.Parent = floatingBtn
+floatingLabel.BackgroundTransparency = 1
+floatingLabel.Position = UDim2.new(0, 31, 0, 0)
+floatingLabel.Size = UDim2.new(1, -36, 1, 0)
+floatingLabel.Font = Enum.Font.GothamBlack
+floatingLabel.Text = ui_options.hud_button_text
+floatingLabel.TextColor3 = WHITE
+floatingLabel.TextSize = compactHud and 12 or 13
+floatingLabel.TextTruncate = Enum.TextTruncate.AtEnd
+floatingLabel.TextXAlignment = Enum.TextXAlignment.Left
+floatingLabel.ZIndex = 101
+
+local floatingLabelStroke = Instance.new("UIStroke")
+floatingLabelStroke.Color = INK_OUTLINE
+floatingLabelStroke.Thickness = 1.5
+floatingLabelStroke.Transparency = 0
+floatingLabelStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+floatingLabelStroke.Parent = floatingLabel
+
+local floatingIconStroke = Instance.new("UIStroke")
+floatingIconStroke.Color = INK_OUTLINE
+floatingIconStroke.Thickness = 1.3
+floatingIconStroke.Transparency = 0
+floatingIconStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+floatingIconStroke.Parent = floatingIcon
 
 do
 	local dragStart, startPos, hasMoved = nil, nil, false
@@ -717,11 +760,12 @@ function library:AddWindow(title, options)
 	local function applyFloatingTheme()
 		floatingStroke.Color = palette.isNeon and palette.neonBright or INK_OUTLINE
 		floatingStroke.Thickness = palette.strokeThickness
-		floatingBtn.BackgroundColor3 = palette.isNeon and palette.main or palette.surface
-		floatingBtn.TextColor3 = palette.text
-		floatingBtn.Font = palette.fontTitle
-		floatingBtn.Text = imgui.Enabled and palette.guiIcon or palette.guiHiddenIcon
-		setGradientState(floatingBtn, palette.isNeon, palette.main, palette.neonBright, 45)
+		floatingBtn.BackgroundColor3 = imgui.Enabled and palette.main or shiftColor(palette.main, -0.25)
+		floatingIcon.Text = imgui.Enabled and palette.guiIcon or palette.guiHiddenIcon
+		floatingIcon.Font = palette.fontTitle
+		floatingLabel.Font = palette.fontTitle
+		floatingLabel.Text = imgui.Enabled and ui_options.hud_button_text or "OPEN"
+		setGradientState(floatingBtn, palette.isNeon, palette.main, palette.neonBright, 90)
 	end
 
 	syncFloatingGuiBtn = applyFloatingTheme
@@ -831,7 +875,7 @@ function library:AddWindow(title, options)
 		setGradientState(InnerFrame, p.isNeon, p.bg, p.neonDeep, 90)
 	end)
 
-	-- Placa inclinada del título (inspirada en STATS / REBIRTH / ITEMS / QUESTS / MOVES)
+	-- Placa del título estilo insignia del juego
 	local TitleBadge = Instance.new("Frame")
 	TitleBadge.Name = "TitleBadge"
 	TitleBadge.Parent = Bar
@@ -1260,7 +1304,7 @@ function library:AddWindow(title, options)
 			return lbl
 		end
 
-		-- ELEMENTO: BUTTON (estilo botón de acción del juego con contorno oscuro)
+		-- ELEMENTO: BUTTON
 		function tab_data:AddButton(button_text, callback)
 			callback = typeof(callback) == "function" and callback or function() end
 
@@ -1436,7 +1480,7 @@ function library:AddWindow(title, options)
 
 		tab_data.AddModeSwitch = tab_data.AddNeonSwitch
 
-		-- ELEMENTO: SLIDER (estilo barra de progreso del juego)
+		-- ELEMENTO: SLIDER
 		function tab_data:AddSlider(slider_text, callback, slider_options)
 			local slider_data = {}
 			callback = typeof(callback) == "function" and callback or function() end
@@ -1958,7 +2002,7 @@ function library:AddWindow(title, options)
 				isExpanded = not isExpanded
 				dropdown_open = isExpanded
 				Tween(arrow, {Rotation = isExpanded and 180 or 0})
-				tsStroke.Color = isExpanded and (palette.isNeon and palette.neonBright or palette.main) or palette.cardBorder
+				tsStroke.Color = isExpanded and (palette.isNeon and palette.neonBright or palette.main) or p.cardBorder
 				local listH = math.min(#THEME_ORDER * 33, 150)
 				listFrame.Size = UDim2.new(1, -16, 0, listH)
 				Tween(wrapper, {Size = UDim2.new(1, 0, 0, isExpanded and (46 + listH) or 36)})
@@ -1977,7 +2021,7 @@ function library:AddWindow(title, options)
 		-- Alias por compatibilidad
 		tab_data.AddThemeDropdown = tab_data.AddThemeSelector
 
-		-- ELEMENTO: FOLDER (estilo tarjeta plegable con borde definido)
+		-- ELEMENTO: FOLDER
 		function tab_data:AddFolder(folder_name)
 			local folder_data = {}
 			folder_name = tostring(folder_name or "Folder")
