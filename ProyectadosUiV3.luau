@@ -205,7 +205,6 @@ local function getSavedWindowColors(winKey)
 	return nil, nil, nil
 end
 
--- Utilidades de ajuste de tonos derivados del fondo y acento
 local function shiftColor(c, delta)
 	return Color3.new(
 		math.clamp(c.R + delta, 0, 1),
@@ -428,21 +427,23 @@ local function addStroke(parent, color, thickness, transparency)
 	return s
 end
 
--- Permite arrastrar desde el borde grueso o cualquier área libre manteniendo quieta la cámara
-local function makeDraggable(dragHandle, targetFrame)
+-- Permite arrastrar desde cualquier parte del borde morado (marco exterior y barra superior)
+local function bindWindowDrag(targetFrame, handles)
 	local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
 
-	runtime:Connect(dragHandle.InputBegan, function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			if not dragging then
-				dragging = true
-				dragInput = input
-				dragStart = input.Position
-				startPos = targetFrame.Position
-				setCameraLocked(true)
+	for _, handle in ipairs(handles) do
+		runtime:Connect(handle.InputBegan, function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				if not dragging then
+					dragging = true
+					dragInput = input
+					dragStart = input.Position
+					startPos = targetFrame.Position
+					setCameraLocked(true)
+				end
 			end
-		end
-	end)
+		end)
+	end
 
 	runtime:Connect(UIS.InputChanged, function(input)
 		if dragging and (input == dragInput or input.UserInputType == Enum.UserInputType.MouseMovement) then
@@ -511,7 +512,6 @@ function library:AddWindow(title, options)
 		tween_time = 0.16,
 	}
 
-	-- Suscriptores de tema para actualizar colores en tiempo real sin bucles Heartbeat
 	local themeCallbacks = {}
 	local function onThemeChange(fn)
 		table.insert(themeCallbacks, fn)
@@ -531,10 +531,10 @@ function library:AddWindow(title, options)
 	local startX = math.max(12, math.floor((vp.X - initialSize.X) / 2) + ((windows - 1) * 18))
 	local startY = math.clamp(60 + ((windows - 1) * 18), 54, math.max(54, vp.Y - initialSize.Y - 12))
 
-	local BORDER_THICKNESS = 5
+	local BORDER_THICKNESS = 8
 	local MINIMIZED_HEIGHT = 30 + (BORDER_THICKNESS * 2)
 
-	-- Marco Exterior (Borde grueso e interactivo para arrastrar toda la UI)
+	-- Marco Exterior Morado (Borde grueso arrastrable por los 4 lados)
 	local Window = Instance.new("Frame")
 	Window.Name = "Window_" .. windows
 	Window.Parent = windowsFrame
@@ -544,7 +544,7 @@ function library:AddWindow(title, options)
 	Window.ClipsDescendants = true
 	Window.Position = UDim2.new(0, startX, 0, startY)
 	Window.Size = UDim2.new(0, initialSize.X, 0, initialSize.Y)
-	addCorner(Window, 10)
+	addCorner(Window, 11)
 	local windowGlowStroke = addStroke(Window, shiftColor(opts.main_color, 0.35), 1.5, 0.35)
 
 	local borderGrad = Instance.new("UIGradient")
@@ -555,13 +555,10 @@ function library:AddWindow(title, options)
 	borderGrad.Rotation = 45
 	borderGrad.Parent = Window
 
-	makeDraggable(Window, Window)
-
-	-- Contenedor Interior
+	-- Contenedor Interior (sin Active=true para no bloquear el arrastre del marco ni de la barra)
 	local InnerFrame = Instance.new("Frame")
 	InnerFrame.Name = "Inner"
 	InnerFrame.Parent = Window
-	InnerFrame.Active = true
 	InnerFrame.BackgroundColor3 = opts.bg_color
 	InnerFrame.BorderSizePixel = 0
 	InnerFrame.ClipsDescendants = true
@@ -569,10 +566,11 @@ function library:AddWindow(title, options)
 	InnerFrame.Size = UDim2.new(1, -(BORDER_THICKNESS * 2), 1, -(BORDER_THICKNESS * 2))
 	addCorner(InnerFrame, 7)
 
-	-- Barra Superior
+	-- Barra Superior Morada (también arrastrable)
 	local Bar = Instance.new("Frame")
 	Bar.Name = "Bar"
 	Bar.Parent = InnerFrame
+	Bar.Active = true
 	Bar.BackgroundColor3 = opts.main_color
 	Bar.BorderSizePixel = 0
 	Bar.Size = UDim2.new(1, 0, 0, 30)
@@ -592,6 +590,28 @@ function library:AddWindow(title, options)
 		ColorSequenceKeypoint.new(1, Color3.fromRGB(205, 205, 215))
 	})
 	barGrad.Parent = Bar
+
+	-- Zonas invisibles extra en los 4 bordes morados para facilitar agarrarlo en pantalla táctil
+	local dragHandles = {Window, Bar}
+	local edgeConfigs = {
+		{pos = UDim2.new(0, 0, 0, 0), size = UDim2.new(1, 0, 0, BORDER_THICKNESS + 4)}, -- Arriba
+		{pos = UDim2.new(0, 0, 1, -(BORDER_THICKNESS + 4)), size = UDim2.new(1, -26, 0, BORDER_THICKNESS + 4)}, -- Abajo
+		{pos = UDim2.new(0, 0, 0, 0), size = UDim2.new(0, BORDER_THICKNESS + 4, 1, 0)}, -- Izquierda
+		{pos = UDim2.new(1, -(BORDER_THICKNESS + 4), 0, 0), size = UDim2.new(0, BORDER_THICKNESS + 4, 1, -26)}, -- Derecha
+	}
+	for _, cfg in ipairs(edgeConfigs) do
+		local edgeGrab = Instance.new("Frame")
+		edgeGrab.Name = "EdgeGrab"
+		edgeGrab.Parent = Window
+		edgeGrab.Active = true
+		edgeGrab.BackgroundTransparency = 1
+		edgeGrab.Position = cfg.pos
+		edgeGrab.Size = cfg.size
+		edgeGrab.ZIndex = 6
+		table.insert(dragHandles, edgeGrab)
+	end
+
+	bindWindowDrag(Window, dragHandles)
 
 	onThemeChange(function(c)
 		Window.BackgroundColor3 = c.main_color
@@ -613,7 +633,7 @@ function library:AddWindow(title, options)
 	ToggleBtn.Text = "📽️"
 	ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
 	ToggleBtn.TextSize = 13
-	ToggleBtn.ZIndex = 3
+	ToggleBtn.ZIndex = 8
 	addCorner(ToggleBtn, 5)
 
 	-- Título de la Ventana
@@ -677,18 +697,18 @@ function library:AddWindow(title, options)
 	TabsContainer.Position = UDim2.new(0, 10, 0, 36)
 	TabsContainer.Size = UDim2.new(1, -20, 1, -44)
 
-	-- Redimensionador
+	-- Redimensionador (Esquina inferior derecha)
 	local Resizer = Instance.new("TextButton")
 	Resizer.Name = "Resizer"
 	Resizer.Parent = Window
 	Resizer.BackgroundTransparency = 1
-	Resizer.Position = UDim2.new(1, -24, 1, -24)
-	Resizer.Size = UDim2.new(0, 24, 0, 24)
+	Resizer.Position = UDim2.new(1, -26, 1, -26)
+	Resizer.Size = UDim2.new(0, 26, 0, 26)
 	Resizer.Text = "◢"
-	Resizer.TextColor3 = Color3.fromRGB(230, 215, 255)
-	Resizer.TextSize = 12
+	Resizer.TextColor3 = Color3.fromRGB(235, 220, 255)
+	Resizer.TextSize = 13
 	Resizer.Visible = opts.can_resize
-	Resizer.ZIndex = 10
+	Resizer.ZIndex = 12
 
 	local isOpen = true
 	local savedHeight = initialSize.Y
@@ -815,7 +835,6 @@ function library:AddWindow(title, options)
 		end
 	end
 
-	-- Métodos para cambiar y guardar colores en tiempo real
 	function window_data:SetMainColor(new_color)
 		if typeof(new_color) == "Color3" then
 			opts.main_color = new_color
@@ -1442,7 +1461,7 @@ function library:AddWindow(title, options)
 			return dropdown_data, wrapper
 		end
 
-		-- ELEMENTO: COLOR PICKER (Paleta rápida + Sliders RGB con autoguardado)
+		-- ELEMENTO: COLOR PICKER
 		function tab_data:AddColorPicker(picker_text, callback, default_col)
 			local picker_data = {}
 			picker_text = tostring(picker_text or "Color Principal")
@@ -1502,7 +1521,6 @@ function library:AddWindow(title, options)
 			panel.Position = UDim2.new(0, 8, 0, 34)
 			panel.Size = UDim2.new(1, -16, 0, 104)
 
-			-- Paleta de colores predefinidos
 			local presetsRow = Instance.new("Frame")
 			presetsRow.Name = "Presets"
 			presetsRow.Parent = panel
@@ -1516,13 +1534,13 @@ function library:AddWindow(title, options)
 			presetLayout.Padding = UDim.new(0, 6)
 
 			local presetColors = {
-				Color3.fromRGB(110, 50, 160), -- Morado
-				Color3.fromRGB(0, 145, 220),  -- Azul Cian
-				Color3.fromRGB(200, 45, 70),  -- Rojo Carmesí
-				Color3.fromRGB(35, 165, 95),  -- Verde Esmeralda
-				Color3.fromRGB(225, 130, 30), -- Naranja
-				Color3.fromRGB(215, 65, 155), -- Rosa Neón
-				Color3.fromRGB(18, 18, 22),   -- Oscuro
+				Color3.fromRGB(110, 50, 160),
+				Color3.fromRGB(0, 145, 220),
+				Color3.fromRGB(200, 45, 70),
+				Color3.fromRGB(35, 165, 95),
+				Color3.fromRGB(225, 130, 30),
+				Color3.fromRGB(215, 65, 155),
+				Color3.fromRGB(18, 18, 22),
 			}
 
 			local rgbUpdaters = {}
@@ -1554,7 +1572,6 @@ function library:AddWindow(title, options)
 				end)
 			end
 
-			-- Barras R, G, B
 			local channels = {
 				{name = "R", col = Color3.fromRGB(220, 65, 65), y = 28},
 				{name = "G", col = Color3.fromRGB(65, 200, 95), y = 54},
