@@ -69,8 +69,9 @@ local WHITE = Color3.new(1, 1, 1)
 local BLACK = Color3.new(0, 0, 0)
 local DEFAULT_TWEEN = TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
--- Catálogo de temas predefinidos (cada uno con paleta, tipografía y geometría única)
+-- Catálogo de temas predefinidos (Default Elirium primero para restaurar la base original)
 local THEME_ORDER = {
+	"Default Elirium",
 	"Morado Neón",
 	"Carmesí Imperial",
 	"Ciber Cian",
@@ -81,6 +82,16 @@ local THEME_ORDER = {
 }
 
 local THEMES = {
+	["Default Elirium"] = {
+		main_color = Color3.fromRGB(162, 62, 255),
+		bg_color = Color3.fromRGB(16, 15, 21),
+		text_color = Color3.fromRGB(245, 245, 250),
+		font_title = Enum.Font.GothamBold,
+		font_body = Enum.Font.GothamMedium,
+		corner_window = 14,
+		corner_card = 10,
+		stroke_thickness = 2.2,
+	},
 	["Morado Neón"] = {
 		main_color = Color3.fromRGB(162, 62, 255),
 		bg_color = Color3.fromRGB(16, 15, 21),
@@ -153,7 +164,7 @@ local THEMES = {
 	},
 }
 
-local DEFAULT_THEME_NAME = "Morado Neón"
+local DEFAULT_THEME_NAME = "Default Elirium"
 
 local ui_options = {
 	theme = DEFAULT_THEME_NAME,
@@ -940,7 +951,7 @@ function library:AddWindow(title, options)
 	end
 
 	function window_data:ResetTheme()
-		window_data:SetTheme(requestedTheme)
+		window_data:SetTheme(DEFAULT_THEME_NAME)
 	end
 	window_data.ResetColors = window_data.ResetTheme
 
@@ -1447,7 +1458,7 @@ function library:AddWindow(title, options)
 				for _ in pairs(itemsMap) do count = count + 1 end
 				local targetListH = math.min(count * 28, 130)
 				listFrame.Size = UDim2.new(1, -12, 0, targetListH)
-				ddStroke.Color = isExpanded and palette.activeStroke or palette.cardStroke
+				ddStroke.Color = isExpanded and palette.activeStroke or p.cardStroke
 				Tween(wrapper, {Size = UDim2.new(1, 0, 0, isExpanded and (38 + targetListH) or 32)})
 			end
 
