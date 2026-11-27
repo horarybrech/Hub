@@ -67,7 +67,7 @@ end
 
 local WHITE = Color3.new(1, 1, 1)
 local BLACK = Color3.new(0, 0, 0)
-local DEFAULT_TWEEN = TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local DEFAULT_TWEEN = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 -- Temas (sin Default Elirium, con emojis de Elirium en el tema morado)
 local THEME_ORDER = {
@@ -560,20 +560,19 @@ local function addStroke(parent, color, thickness, transparency)
 	return s
 end
 
-local function ensureGradient(parent, colorA, colorB, angle)
+local function setGradientState(parent, enabled, colorA, colorB, angle)
 	local grad = parent:FindFirstChildOfClass("UIGradient")
-	if not grad then
-		grad = Instance.new("UIGradient")
-		grad.Parent = parent
+	if enabled then
+		if not grad then
+			grad = Instance.new("UIGradient")
+			grad.Parent = parent
+		end
+		grad.Color = ColorSequence.new(colorA, colorB)
+		grad.Rotation = angle or 0
+		grad.Enabled = true
+	elseif grad then
+		grad.Enabled = false
 	end
-	grad.Color = ColorSequence.new(colorA, colorB)
-	grad.Rotation = angle or 0
-	return grad
-end
-
-local function removeGradient(parent)
-	local grad = parent:FindFirstChildOfClass("UIGradient")
-	if grad then grad:Destroy() end
 end
 
 local function bindWindowDrag(targetFrame, handles)
@@ -641,7 +640,7 @@ function library:AddWindow(title, options)
 		neon = initialNeon,
 		min_size = hardMinSize,
 		can_resize = (typeof(options) == "table" and options.can_resize ~= nil) and options.can_resize or ui_options.can_resize,
-		tween_time = 0.15,
+		tween_time = 0.12,
 	}
 
 	-- Paleta dinámica: Sólido (apagado) o Neón (encendido)
@@ -710,11 +709,7 @@ function library:AddWindow(title, options)
 		floatingBtn.TextColor3 = palette.text
 		floatingBtn.Font = palette.fontTitle
 		floatingBtn.Text = imgui.Enabled and palette.guiIcon or palette.guiHiddenIcon
-		if palette.isNeon then
-			ensureGradient(floatingBtn, palette.main, palette.neonBright, 45)
-		else
-			removeGradient(floatingBtn)
-		end
+		setGradientState(floatingBtn, palette.isNeon, palette.main, palette.neonBright, 45)
 	end
 
 	syncFloatingGuiBtn = applyFloatingTheme
@@ -809,13 +804,8 @@ function library:AddWindow(title, options)
 		InnerFrame.BackgroundColor3 = p.bg
 		Bar.BackgroundColor3 = p.bar
 		BarCover.BackgroundColor3 = p.bar
-		if p.isNeon then
-			ensureGradient(Bar, p.bar, p.neonDeep, 0)
-			ensureGradient(BarCover, p.bar, p.neonDeep, 0)
-		else
-			removeGradient(Bar)
-			removeGradient(BarCover)
-		end
+		setGradientState(Bar, p.isNeon, p.bar, p.neonDeep, 0)
+		setGradientState(BarCover, p.isNeon, p.bar, p.neonDeep, 0)
 	end)
 
 	-- Botón circular minimizar
@@ -938,7 +928,10 @@ function library:AddWindow(title, options)
 	local dropdown_open = false
 
 	local function applyTabLayoutGeometry()
-		sidebarW = isCompactDevice() and 96 or 114
+		local nextSidebarW = isCompactDevice() and 96 or 114
+		if nextSidebarW ~= sidebarW then
+			sidebarW = nextSidebarW
+		end
 		TabSelection.Size = UDim2.new(0, sidebarW, 1, -50)
 		TabSelection.Position = UDim2.new(0, 8, 0, 42)
 		if hasTabs then
@@ -1111,11 +1104,7 @@ function library:AddWindow(title, options)
 				st.Color = palette.isNeon and palette.neonBright or palette.main
 				st.Thickness = palette.strokeThickness
 			end
-			if palette.isNeon then
-				ensureGradient(btn, palette.main, palette.neonBright, 0)
-			else
-				removeGradient(btn)
-			end
+			setGradientState(btn, palette.isNeon, palette.main, palette.neonBright, 0)
 		else
 			btn.BackgroundColor3 = palette.bg
 			btn.TextColor3 = palette.muted
@@ -1123,7 +1112,7 @@ function library:AddWindow(title, options)
 				st.Color = palette.border
 				st.Thickness = palette.strokeThickness
 			end
-			removeGradient(btn)
+			setGradientState(btn, false)
 		end
 	end
 
@@ -1246,11 +1235,7 @@ function library:AddWindow(title, options)
 				btn.BackgroundColor3 = p.main
 				btnStroke.Color = p.isNeon and p.neonBright or p.border
 				btnStroke.Thickness = p.strokeThickness
-				if p.isNeon then
-					ensureGradient(btn, p.main, p.neonBright, 0)
-				else
-					removeGradient(btn)
-				end
+				setGradientState(btn, p.isNeon, p.main, p.neonBright, 0)
 			end)
 
 			runtime:Connect(btn.MouseButton1Click, function()
@@ -1326,16 +1311,12 @@ function library:AddWindow(title, options)
 					pill.BackgroundColor3 = p.main
 					knob.BackgroundColor3 = WHITE
 					knob.Position = UDim2.new(1, -17, 0.5, -7)
-					if p.isNeon then
-						ensureGradient(pill, p.main, p.neonBright, 0)
-					else
-						removeGradient(pill)
-					end
+					setGradientState(pill, p.isNeon, p.main, p.neonBright, 0)
 				else
 					pill.BackgroundColor3 = p.bg
 					knob.BackgroundColor3 = p.muted
 					knob.Position = UDim2.new(0, 3, 0.5, -7)
-					removeGradient(pill)
+					setGradientState(pill, false)
 				end
 			end
 
@@ -1344,11 +1325,7 @@ function library:AddWindow(title, options)
 			local function updateVisual(state, animate)
 				syncSwitchTheme(palette)
 				if animate then
-					if state then
-						Tween(knob, {Position = UDim2.new(1, -17, 0.5, -7)})
-					else
-						Tween(knob, {Position = UDim2.new(0, 3, 0.5, -7)})
-					end
+					Tween(knob, {Position = state and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)})
 				end
 			end
 
@@ -1407,7 +1384,7 @@ function library:AddWindow(title, options)
 
 		tab_data.AddModeSwitch = tab_data.AddNeonSwitch
 
-		-- ELEMENTO: SLIDER
+		-- ELEMENTO: SLIDER (actualización directa sin tweens al arrastrar)
 		function tab_data:AddSlider(slider_text, callback, slider_options)
 			local slider_data = {}
 			callback = typeof(callback) == "function" and callback or function() end
@@ -1492,11 +1469,7 @@ function library:AddWindow(title, options)
 				track.BackgroundColor3 = p.bg
 				trackStroke.Color = p.border
 				fill.BackgroundColor3 = p.main
-				if p.isNeon then
-					ensureGradient(fill, p.main, p.neonBright, 0)
-				else
-					removeGradient(fill)
-				end
+				setGradientState(fill, p.isNeon, p.main, p.neonBright, 0)
 			end)
 
 			local hitArea = Instance.new("TextButton")
