@@ -2,74 +2,74 @@ local nativeTask = task
 local runtime = {Alive = true, Threads = {}, Connections = {}, Cleanups = {}}
 
 function runtime:Schedule(schedule, callback, ...)
-	if not self.Alive then return end
-	local arguments = table.pack(...)
-	local thread
-	thread = coroutine.create(function()
-		if not self.Alive then self.Threads[thread] = nil return end
-		local results = table.pack(pcall(callback, table.unpack(arguments, 1, arguments.n)))
-		self.Threads[thread] = nil
-		if not results[1] then error(results[2], 0) end
-		return table.unpack(results, 2, results.n)
-	end)
-	self.Threads[thread] = true
-	schedule(thread)
-	return thread
+    if not self.Alive then return end
+    local arguments = table.pack(...)
+    local thread
+    thread = coroutine.create(function()
+        if not self.Alive then self.Threads[thread] = nil return end
+        local results = table.pack(pcall(callback, table.unpack(arguments, 1, arguments.n)))
+        self.Threads[thread] = nil
+        if not results[1] then error(results[2], 0) end
+        return table.unpack(results, 2, results.n)
+    end)
+    self.Threads[thread] = true
+    schedule(thread)
+    return thread
 end
 
 function runtime:Spawn(callback, ...)
-	return self:Schedule(nativeTask.spawn, callback, ...)
+    return self:Schedule(nativeTask.spawn, callback, ...)
 end
 
 function runtime:Defer(callback, ...)
-	return self:Schedule(nativeTask.defer, callback, ...)
+    return self:Schedule(nativeTask.defer, callback, ...)
 end
 
 function runtime:Delay(seconds, callback, ...)
-	return self:Schedule(function(thread) nativeTask.delay(seconds, thread) end, callback, ...)
+    return self:Schedule(function(thread) nativeTask.delay(seconds, thread) end, callback, ...)
 end
 
 function runtime:Connect(signal, callback)
-	if not self.Alive then return end
-	local connection = signal:Connect(function(...)
-		self:Spawn(callback, ...)
-	end)
-	self.Connections[connection] = true
-	return connection
+    if not self.Alive then return end
+    local connection = signal:Connect(function(...)
+        self:Spawn(callback, ...)
+    end)
+    self.Connections[connection] = true
+    return connection
 end
 
 function runtime:AddCleanup(callback)
-	if self.Alive then
-		table.insert(self.Cleanups, callback)
-	else
-		pcall(callback)
-	end
-	return callback
+    if self.Alive then
+        table.insert(self.Cleanups, callback)
+    else
+        pcall(callback)
+    end
+    return callback
 end
 
 function runtime:Destroy()
-	if not self.Alive then return end
-	self.Alive = false
-	for connection in pairs(self.Connections) do
-		pcall(function() connection:Disconnect() end)
-	end
-	table.clear(self.Connections)
-	local current = coroutine.running()
-	for thread in pairs(self.Threads) do
-		if thread ~= current and coroutine.status(thread) ~= "dead" then
-			pcall(nativeTask.cancel, thread)
-		end
-	end
-	table.clear(self.Threads)
-	for index = #self.Cleanups, 1, -1 do
-		pcall(self.Cleanups[index])
-	end
-	table.clear(self.Cleanups)
-	if _G.SilenceRuntime == self then _G.SilenceRuntime = nil end
+    if not self.Alive then return end
+    self.Alive = false
+    for connection in pairs(self.Connections) do
+        pcall(function() connection:Disconnect() end)
+    end
+    table.clear(self.Connections)
+    local current = coroutine.running()
+    for thread in pairs(self.Threads) do
+        if thread ~= current and coroutine.status(thread) ~= "dead" then
+            pcall(nativeTask.cancel, thread)
+        end
+    end
+    table.clear(self.Threads)
+    for index = #self.Cleanups, 1, -1 do
+        pcall(self.Cleanups[index])
+    end
+    table.clear(self.Cleanups)
+    if _G.SilenceRuntime == self then _G.SilenceRuntime = nil end
 end
 
 if _G.SilenceRuntime then
-	_G.SilenceRuntime:Destroy()
+    _G.SilenceRuntime:Destroy()
 end
 _G.SilenceRuntime = runtime
 runtime.Threads[coroutine.running()] = true
@@ -84,132 +84,12 @@ do
 	isSolara = success and type(executorName) == "string" and string.lower(executorName) == "solara"
 end
 
-local THEME_ORDER = {
-	"Default Elirium",
-	"Morado Neón",
-	"Carmesí Imperial",
-	"Ciber Cian",
-	"Esmeralda Tóxica",
-	"Oro Real",
-	"Rosa Sakura",
-	"Mecha Titanio",
-}
-
-local THEMES = {
-	["Default Elirium"] = {
-		main_color = Color3.fromRGB(110, 50, 160),
-		bg_color = Color3.new(0.0823529, 0.0862745, 0.0901961),
-		text_color = Color3.new(1, 1, 1),
-		font_title = Enum.Font.GothamBold,
-		font_body = Enum.Font.GothamSemibold,
-	},
-	["Morado Neón"] = {
-		main_color = Color3.fromRGB(162, 62, 255),
-		bg_color = Color3.fromRGB(16, 15, 21),
-		text_color = Color3.fromRGB(245, 245, 250),
-		font_title = Enum.Font.GothamBold,
-		font_body = Enum.Font.GothamMedium,
-	},
-	["Carmesí Imperial"] = {
-		main_color = Color3.fromRGB(230, 46, 77),
-		bg_color = Color3.fromRGB(20, 12, 14),
-		text_color = Color3.fromRGB(255, 244, 246),
-		font_title = Enum.Font.FredokaOne,
-		font_body = Enum.Font.GothamBold,
-	},
-	["Ciber Cian"] = {
-		main_color = Color3.fromRGB(0, 210, 255),
-		bg_color = Color3.fromRGB(11, 18, 28),
-		text_color = Color3.fromRGB(235, 249, 255),
-		font_title = Enum.Font.RobotoMono,
-		font_body = Enum.Font.RobotoMono,
-	},
-	["Esmeralda Tóxica"] = {
-		main_color = Color3.fromRGB(30, 215, 96),
-		bg_color = Color3.fromRGB(12, 20, 16),
-		text_color = Color3.fromRGB(240, 255, 245),
-		font_title = Enum.Font.Ubuntu,
-		font_body = Enum.Font.Ubuntu,
-	},
-	["Oro Real"] = {
-		main_color = Color3.fromRGB(245, 175, 25),
-		bg_color = Color3.fromRGB(20, 17, 12),
-		text_color = Color3.fromRGB(255, 251, 240),
-		font_title = Enum.Font.TitilliumWeb,
-		font_body = Enum.Font.TitilliumWeb,
-	},
-	["Rosa Sakura"] = {
-		main_color = Color3.fromRGB(245, 75, 175),
-		bg_color = Color3.fromRGB(22, 13, 20),
-		text_color = Color3.fromRGB(255, 242, 250),
-		font_title = Enum.Font.Cartoon,
-		font_body = Enum.Font.GothamBold,
-	},
-	["Mecha Titanio"] = {
-		main_color = Color3.fromRGB(190, 205, 225),
-		bg_color = Color3.fromRGB(18, 20, 25),
-		text_color = Color3.fromRGB(245, 248, 255),
-		font_title = Enum.Font.Sarpanch,
-		font_body = Enum.Font.Sarpanch,
-	},
-}
-
-local DEFAULT_THEME_NAME = "Default Elirium"
-
 local ui_options = {
-	theme = DEFAULT_THEME_NAME,
-	main_color = THEMES[DEFAULT_THEME_NAME].main_color,
+	main_color = Color3.fromRGB(110, 50, 160),
 	min_size = Vector2.new(400, 300),
 	toggle_key = Enum.KeyCode.RightShift,
 	can_resize = true,
 }
-
-local HttpService = game:GetService("HttpService")
-local CONFIG_FILE = "UniversalUI_Config.json"
-_G.UniversalUISavedConfig = _G.UniversalUISavedConfig or {}
-
-do
-	if type(isfile) == "function" and type(readfile) == "function" then
-		local ok, raw = pcall(function()
-			return isfile(CONFIG_FILE) and readfile(CONFIG_FILE) or nil
-		end)
-		if ok and type(raw) == "string" and #raw > 0 then
-			local decOk, decoded = pcall(HttpService.JSONDecode, HttpService, raw)
-			if decOk and type(decoded) == "table" then
-				for k, v in pairs(decoded) do
-					_G.UniversalUISavedConfig[k] = v
-				end
-			end
-		end
-	end
-end
-
-local pendingWrite = false
-local function flushConfigFile()
-	if pendingWrite or type(writefile) ~= "function" then return end
-	pendingWrite = true
-	nativeTask.delay(0.4, function()
-		pendingWrite = false
-		pcall(function()
-			writefile(CONFIG_FILE, HttpService:JSONEncode(_G.UniversalUISavedConfig))
-		end)
-	end)
-end
-
-local function saveWindowTheme(winKey, themeName)
-	local entry = _G.UniversalUISavedConfig[winKey] or {}
-	entry.theme = themeName
-	_G.UniversalUISavedConfig[winKey] = entry
-	flushConfigFile()
-end
-
-local function getSavedWindowTheme(winKey)
-	local entry = _G.UniversalUISavedConfig[winKey]
-	if type(entry) == "table" and type(entry.theme) == "string" and THEMES[entry.theme] then
-		return entry.theme
-	end
-	return nil
-end
 
 do
 	local function destroyImguiIn(parent)
@@ -218,10 +98,10 @@ do
 			if existing then
 				pcall(function() existing:Destroy() end)
 			end
-			local toggleExist = parent:FindFirstChild("ToggleUI")
-			if toggleExist then
-				pcall(function() toggleExist:Destroy() end)
-			end
+            local toggleExist = parent:FindFirstChild("ToggleUI")
+            if toggleExist then
+                pcall(function() toggleExist:Destroy() end)
+            end
 		end
 	end
 
@@ -242,7 +122,7 @@ do
 	end
 
 	if not isSolara then
-		for _, v in pairs(game:GetDescendants()) do
+		for _,v in pairs(game:GetDescendants()) do
 			if (v.Name == "imgui" or v.Name == "ToggleUI") and v:IsA("ScreenGui") then
 				pcall(function() v:Destroy() end)
 			end
@@ -253,7 +133,6 @@ end
 local imgui = Instance.new("ScreenGui")
 runtime:AddCleanup(function() imgui:Destroy() end)
 runtime:Connect(imgui.Destroying, function() runtime:Destroy() end)
-
 local prefabs = Instance.new("Frame")
 local label = Instance.new("TextLabel")
 local window = Instance.new("ImageLabel")
@@ -325,7 +204,6 @@ local title4Label = Instance.new("TextLabel")
 local inputButton = Instance.new("TextButton")
 local inputRoundify4px = Instance.new("ImageLabel")
 local windowsFrame = Instance.new("Frame")
-
 local cloneref = type(cloneref) == "function" and cloneref or function(...) return ... end
 local CoreGui
 if not isSolara then pcall(function() CoreGui = game:GetService("CoreGui") end) end
@@ -338,7 +216,6 @@ if not isSolara and type(gethui) == "function" then
 end
 if not imgui.Parent and CoreGui then pcall(function() imgui.Parent = CoreGui end) end
 if not imgui.Parent then imgui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui") end
-
 prefabs.Name = "Prefabs"
 prefabs.Parent = imgui
 prefabs.BackgroundColor3 = Color3.new(1, 1, 1)
@@ -699,17 +576,17 @@ textButtonRoundify4px_3.ImageColor3 = Color3.fromRGB(110, 50, 160)
 textButtonRoundify4px_3.ScaleType = Enum.ScaleType.Slice
 textButtonRoundify4px_3.SliceCenter = Rect.new(4, 4, 4, 4)
 
-toggle2.Name = "Toggle"
-toggle2.Parent = button
-toggle2.BackgroundColor3 = Color3.new(1, 1, 1)
-toggle2.BackgroundTransparency = 1
-toggle2.Position = UDim2.new(0, 5, 0, 0)
-toggle2.Size = UDim2.new(0, 20, 0, 20)
-toggle2.Image = "https://www.roblox.com/Thumbs/Asset.ashx?width=420&height=420&assetId=4731371541"
+	toggle2.Name = "Toggle"
+	toggle2.Parent = button
+	toggle2.BackgroundColor3 = Color3.new(1, 1, 1)
+	toggle2.BackgroundTransparency = 1
+	toggle2.Position = UDim2.new(0, 5, 0, 0)
+	toggle2.Size = UDim2.new(0, 20, 0, 20)
+	toggle2.Image = "https://www.roblox.com/Thumbs/Asset.ashx?width=420&height=420&assetId=4731371541"
 
-local toggle2Corner = Instance.new("UICorner")
-toggle2Corner.CornerRadius = UDim.new(0.5, 0)
-toggle2Corner.Parent = toggle2
+	local toggle2Corner = Instance.new("UICorner")
+	toggle2Corner.CornerRadius = UDim.new(0.5, 0)
+	toggle2Corner.Parent = toggle2
 
 objects2.Name = "Objects"
 objects2.Parent = folder
@@ -1082,6 +959,7 @@ local checks = {
 	["binding"] = false,
 }
 
+-- MANTENER BOTÓN DE PC ORIGINAL (RightShift)
 runtime:Connect(UIS.InputBegan, function(input, gameProcessed)
 	if input.KeyCode == ((typeof(ui_options.toggle_key) == "EnumItem") and ui_options.toggle_key or Enum.KeyCode.RightShift) then
 		if root then
@@ -1092,11 +970,12 @@ runtime:Connect(UIS.InputBegan, function(input, gameProcessed)
 	end
 end)
 
+-- NUEVO: BOTÓN FLOTANTE APARTE PARA ABRIR/CERRAR LA UI (Soporte PC y Móvil)
 local toggleGui = Instance.new("ScreenGui")
 toggleGui.Name = "ToggleUI"
 toggleGui.ResetOnSpawn = false
 if not isSolara and type(gethui) == "function" then
-	pcall(function() toggleGui.Parent = gethui() end)
+    pcall(function() toggleGui.Parent = gethui() end)
 end
 if not toggleGui.Parent and CoreGui then pcall(function() toggleGui.Parent = CoreGui end) end
 if not toggleGui.Parent then toggleGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui") end
@@ -1125,46 +1004,49 @@ local startPos = nil
 local hasMoved = false
 
 floatingBtn.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		isDragging = true
-		hasMoved = false
-		dragStart = input.Position
-		startPos = floatingBtn.Position
-
-		local connection
-		connection = input.Changed:Connect(function()
-			if input.UserInputState == Enum.UserInputState.End then
-				isDragging = false
-				connection:Disconnect()
-			end
-		end)
-	end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDragging = true
+        hasMoved = false
+        dragStart = input.Position
+        startPos = floatingBtn.Position
+        
+        local connection
+        connection = input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                isDragging = false
+                connection:Disconnect()
+            end
+        end)
+    end
 end)
 
 UIS.InputChanged:Connect(function(input)
-	if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and isDragging then
-		if dragStart then
-			local delta = input.Position - dragStart
-			if math.abs(delta.X) > 5 or math.abs(delta.Y) > 5 then
-				hasMoved = true
-				floatingBtn.Position = UDim2.new(
-					startPos.X.Scale, startPos.X.Offset + delta.X,
-					startPos.Y.Scale, startPos.Y.Offset + delta.Y
-				)
-			end
-		end
-	end
+    if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and isDragging then
+        if dragStart then
+            local delta = input.Position - dragStart
+            -- Si se mueve más de 5 píxeles, se considera arrastre y no clic
+            if math.abs(delta.X) > 5 or math.abs(delta.Y) > 5 then
+                hasMoved = true
+                floatingBtn.Position = UDim2.new(
+                    startPos.X.Scale, startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                )
+            end
+        end
+    end
 end)
 
 floatingBtn.MouseButton1Click:Connect(function()
-	if not hasMoved then
-		if root then
-			if not checks.binding and root.Enabled ~= nil then
-				root.Enabled = not root.Enabled
-			end
-		end
-	end
+    -- Si no se arrastró, entonces actuamos como un botón de clic
+    if not hasMoved then
+        if root then
+            if not checks.binding and root.Enabled ~= nil then
+                root.Enabled = not root.Enabled
+            end
+        end
+    end
 end)
+-- FIN DEL BOTÓN FLOTANTE
 
 local function Resize(part, new, _delay)
 	_delay = _delay or 0.5
@@ -1253,13 +1135,10 @@ local function ripple(button, x, y)
 end
 
 local windows = 0
-local library = {
-	Runtime = runtime,
-	Themes = THEME_ORDER,
-}
+local library = {Runtime = runtime}
 
 function library:Destroy()
-	runtime:Destroy()
+    runtime:Destroy()
 end
 
 function library:EnableAntiAFK()
@@ -1304,7 +1183,7 @@ function library:CreatePrivacyRedactor(player, redactorKey)
 	_G.SilencePrivacyGenerations = _G.SilencePrivacyGenerations or {}
 	_G.SilencePrivacyGenerations[key] = (_G.SilencePrivacyGenerations[key] or 0) + 1
 	local generation = _G.SilencePrivacyGenerations[key]
-	runtime:AddCleanup(function() redactor:SetEnabled(false) end)
+    runtime:AddCleanup(function() redactor:SetEnabled(false) end)
 
 	local function replacePlain(text, search, replacement)
 		local startPosition = string.find(text, search, 1, true)
@@ -1402,7 +1281,7 @@ local function format_windows()
 	ull.Parent = windowsFrame
 	local data = {}
 
-	for i, v in pairs(windowsFrame:GetChildren()) do
+	for i,v in pairs(windowsFrame:GetChildren()) do
 		if not (v:IsA("UIListLayout")) then
 			data[v] = v.AbsolutePosition
 		end
@@ -1410,7 +1289,7 @@ local function format_windows()
 
 	ull:Destroy()
 
-	for i, v in pairs(data) do
+	for i,v in pairs(data) do
 		i.Position = UDim2.new(0, v.X, 0, v.Y)
 	end
 end
@@ -1424,70 +1303,36 @@ function library:AddWindow(title, options)
 	windows = windows + 1
 	local dropdown_open = false
 	title = tostring(title or "New Window")
-	local winKey = title .. "_" .. windows
-
-	local savedTheme = getSavedWindowTheme(winKey)
-	local initialThemeName = savedTheme or (typeof(options) == "table" and type(options.theme) == "string" and THEMES[options.theme] and options.theme) or DEFAULT_THEME_NAME
-	local baseTheme = THEMES[initialThemeName] or THEMES[DEFAULT_THEME_NAME]
-
-	options = (typeof(options) == "table") and options or {}
-	local opts = {
-		theme_name = initialThemeName,
-		main_color = (typeof(options.main_color) == "Color3" and not savedTheme) and options.main_color or baseTheme.main_color,
-		bg_color = baseTheme.bg_color,
-		text_color = baseTheme.text_color,
-		font_title = baseTheme.font_title,
-		font_body = baseTheme.font_body,
-		min_size = options.min_size or ui_options.min_size,
-		toggle_key = options.toggle_key or ui_options.toggle_key,
-		can_resize = (options.can_resize ~= nil) and options.can_resize or ui_options.can_resize,
-		tween_time = 0.1,
-	}
+	options = (typeof(options) == "table") and options or ui_options
+	options.tween_time = 0.1
 
 	local Window = prefabs:FindFirstChild("Window"):Clone()
 	Window.Parent = windowsFrame
 	Window:FindFirstChild("Title").Text = title
-	Window.Size = UDim2.new(0, opts.min_size.X, 0, opts.min_size.Y)
+	Window.Size = UDim2.new(0, options.min_size.X, 0, options.min_size.Y)
 	Window.ZIndex = Window.ZIndex + (windows * 10)
 
-	local Title = Window:FindFirstChild("Title")
-	local Bar = Window:FindFirstChild("Bar")
-	local Base = Bar:FindFirstChild("Base")
-	local Top = Bar:FindFirstChild("Top")
-	local TabSelection = Window:FindFirstChild("TabSelection")
-	local SplitFrame = TabSelection:FindFirstChild("Frame")
+	do
+		local Title = Window:FindFirstChild("Title")
+		local Bar = Window:FindFirstChild("Bar")
+		local Base = Bar:FindFirstChild("Base")
+		local Top = Bar:FindFirstChild("Top")
+		local SplitFrame = Window:FindFirstChild("TabSelection"):FindFirstChild("Frame")
+		local Toggle = Bar:FindFirstChild("Toggle")
 
-	local themeListeners = {}
-	local function registerThemeListener(fn)
-		table.insert(themeListeners, fn)
-		pcall(fn, opts)
+		runtime:Spawn(function()
+			while true do
+				Bar.BackgroundColor3 = options.main_color
+				Base.BackgroundColor3 = options.main_color
+				Base.ImageColor3 = options.main_color
+				Top.ImageColor3 = options.main_color
+				SplitFrame.BackgroundColor3 = options.main_color
+
+				RS.Heartbeat:Wait()
+			end
+		end)
+
 	end
-
-	local function applyWindowTheme()
-		local t = THEMES[opts.theme_name] or THEMES[DEFAULT_THEME_NAME]
-		opts.main_color = t.main_color
-		opts.bg_color = t.bg_color
-		opts.text_color = t.text_color
-		opts.font_title = t.font_title
-		opts.font_body = t.font_body
-		ui_options.main_color = opts.main_color
-
-		Window.ImageColor3 = opts.bg_color
-		Bar.BackgroundColor3 = opts.main_color
-		Base.BackgroundColor3 = opts.main_color
-		Base.ImageColor3 = opts.main_color
-		Top.ImageColor3 = opts.main_color
-		SplitFrame.BackgroundColor3 = opts.main_color
-		Title.Font = opts.font_title
-		Title.TextColor3 = opts.text_color
-		floatingBtn.BackgroundColor3 = opts.main_color
-
-		for i = 1, #themeListeners do
-			pcall(themeListeners[i], opts)
-		end
-	end
-
-	applyWindowTheme()
 
 	local Resizer = Window:WaitForChild("Resizer")
 
@@ -1502,41 +1347,21 @@ function library:AddWindow(title, options)
 		Window:FindFirstChild("Title").Text = tostring(new_title or "New Window")
 	end
 
-	function window_data:SetTheme(themeName)
-		if type(themeName) == "string" and THEMES[themeName] then
-			opts.theme_name = themeName
-			applyWindowTheme()
-			saveWindowTheme(winKey, themeName)
-		end
-	end
-
-	function window_data:GetTheme()
-		return opts.theme_name
-	end
-
-	function window_data:GetThemes()
-		return THEME_ORDER
-	end
-
-	function window_data:ResetTheme()
-		window_data:SetTheme(DEFAULT_THEME_NAME)
-	end
-	window_data.ResetColors = window_data.ResetTheme
-
 	do
 		local oldIcon = mouse.Icon
 		local Entered = false
 		runtime:Connect(Resizer.MouseEnter, function()
 			Window.Draggable = false
-			if opts.can_resize then
+			if options.can_resize then
 				oldIcon = mouse.Icon
+
 			end
 			Entered = true
 		end)
 
 		runtime:Connect(Resizer.MouseLeave, function()
 			Entered = false
-			if opts.can_resize then
+			if options.can_resize then
 				mouse.Icon = oldIcon
 			end
 			Window.Draggable = true
@@ -1548,20 +1373,21 @@ function library:AddWindow(title, options)
 				Held = true
 
 				runtime:Spawn(function()
-					if Entered and Resizer.Active and opts.can_resize then
+					if Entered and Resizer.Active and options.can_resize then
 						while Held and Resizer.Active do
+
 							local mouse_location = gMouse()
 							local x = mouse_location.X - Window.AbsolutePosition.X
 							local y = mouse_location.Y - Window.AbsolutePosition.Y
 
-							if x >= opts.min_size.X and y >= opts.min_size.Y then
-								Resize(Window, {Size = UDim2.new(0, x, 0, y)}, opts.tween_time)
-							elseif x >= opts.min_size.X then
-								Resize(Window, {Size = UDim2.new(0, x, 0, opts.min_size.Y)}, opts.tween_time)
-							elseif y >= opts.min_size.Y then
-								Resize(Window, {Size = UDim2.new(0, opts.min_size.X, 0, y)}, opts.tween_time)
+							if x >= options.min_size.X and y >= options.min_size.Y then
+								Resize(Window, {Size = UDim2.new(0, x, 0, y)}, options.tween_time)
+							elseif x >= options.min_size.X then
+								Resize(Window, {Size = UDim2.new(0, x, 0, options.min_size.Y)}, options.tween_time)
+							elseif y >= options.min_size.Y then
+								Resize(Window, {Size = UDim2.new(0, options.min_size.X, 0, y)}, options.tween_time)
 							else
-								Resize(Window, {Size = UDim2.new(0, opts.min_size.X, 0, opts.min_size.Y)}, opts.tween_time)
+								Resize(Window, {Size = UDim2.new(0, options.min_size.X, 0, options.min_size.Y)}, options.tween_time)
 							end
 
 							RS.Heartbeat:Wait()
@@ -1584,14 +1410,15 @@ function library:AddWindow(title, options)
 
 		local oldwindowdata = {}
 		local oldy = Window.AbsoluteSize.Y
-
+		
 		runtime:Connect(open_close.MouseButton1Click, function()
 			if canopen then
 				canopen = false
 
 				if open then
+
 					oldwindowdata = {}
-					for i, v in pairs(Window:FindFirstChild("Tabs"):GetChildren()) do
+					for i,v in pairs(Window:FindFirstChild("Tabs"):GetChildren()) do
 						oldwindowdata[v] = v.Visible
 						v.Visible = false
 					end
@@ -1599,26 +1426,30 @@ function library:AddWindow(title, options)
 					Resizer.Active = false
 
 					oldy = Window.AbsoluteSize.Y
-					Resize(Window, {Size = UDim2.new(0, Window.AbsoluteSize.X, 0, 26)}, opts.tween_time)
+					Resize(Window, {Size = UDim2.new(0, Window.AbsoluteSize.X, 0, 26)}, options.tween_time)
 					open_close.Parent:FindFirstChild("Base").Transparency = 1
+					
+					open_close.Text = "❤️‍🔥" 
 
-					open_close.Text = "❤️‍🔥"
 				else
-					for i, v in pairs(oldwindowdata) do
+
+					for i,v in pairs(oldwindowdata) do
 						i.Visible = v
 					end
 
 					Resizer.Active = true
 
-					Resize(Window, {Size = UDim2.new(0, Window.AbsoluteSize.X, 0, oldy)}, opts.tween_time)
+					Resize(Window, {Size = UDim2.new(0, Window.AbsoluteSize.X, 0, oldy)}, options.tween_time)
 					open_close.Parent:FindFirstChild("Base").Transparency = 0
+					
+					open_close.Text = "📽️" 
 
-					open_close.Text = "📽️"
 				end
 
 				open = not open
-				wait(opts.tween_time)
+				wait(options.tween_time)
 				canopen = true
+
 			end
 		end)
 	end
@@ -1628,892 +1459,1050 @@ function library:AddWindow(title, options)
 		local tab_selection = Window:FindFirstChild("TabSelection")
 		local tab_buttons = tab_selection:FindFirstChild("TabButtons")
 
-		function window_data:AddTab(tab_name)
-			local tab_data = {}
-			tab_name = tostring(tab_name or "New Tab")
-			tab_selection.Visible = true
+		do
+			function window_data:AddTab(tab_name)
+				local tab_data = {}
+				tab_name = tostring(tab_name or "New Tab")
+				tab_selection.Visible = true
 
-			local new_button = prefabs:FindFirstChild("TabButton"):Clone()
-			new_button.Parent = tab_buttons
-			new_button.Text = tab_name
-			new_button.Size = UDim2.new(0, gNameLen(new_button), 0, 20)
-			new_button.ZIndex = new_button.ZIndex + (windows * 10)
-			new_button:GetChildren()[1].ZIndex = new_button:GetChildren()[1].ZIndex + (windows * 10)
+				local new_button = prefabs:FindFirstChild("TabButton"):Clone()
+				new_button.Parent = tab_buttons
+				new_button.Text = tab_name
+				new_button.Size = UDim2.new(0, gNameLen(new_button), 0, 20)
+				new_button.ZIndex = new_button.ZIndex + (windows * 10)
+				new_button:GetChildren()[1].ZIndex = new_button:GetChildren()[1].ZIndex + (windows * 10)
 
-			local new_tab = prefabs:FindFirstChild("Tab"):Clone()
-			new_tab.Parent = tabs
-			new_tab.ZIndex = new_tab.ZIndex + (windows * 10)
+				local new_tab = prefabs:FindFirstChild("Tab"):Clone()
+				new_tab.Parent = tabs
+				new_tab.ZIndex = new_tab.ZIndex + (windows * 10)
 
-			registerThemeListener(function(t)
-				new_button.Font = t.font_body
-				new_button.TextColor3 = t.text_color
-			end)
-
-			local function show()
-				if dropdown_open then return end
-				for _, v in pairs(tab_buttons:GetChildren()) do
-					if not (v:IsA("UIListLayout")) then
-						v:GetChildren()[1].ImageColor3 = Color3.fromRGB(52, 53, 56)
-						Resize(v, {Size = UDim2.new(0, v.AbsoluteSize.X, 0, 20)}, opts.tween_time)
-					end
-				end
-				for _, v in pairs(tabs:GetChildren()) do
-					v.Visible = false
-				end
-
-				Resize(new_button, {Size = UDim2.new(0, new_button.AbsoluteSize.X, 0, 25)}, opts.tween_time)
-				new_button:GetChildren()[1].ImageColor3 = Color3.fromRGB(73, 75, 79)
-				new_tab.Visible = true
-			end
-
-			runtime:Connect(new_button.MouseButton1Click, function()
-				show()
-			end)
-
-			function tab_data:Show()
-				show()
-			end
-
-			function tab_data:AddLabel(label_text)
-				label_text = tostring(label_text or "New Label")
-
-				local label = prefabs:FindFirstChild("Label"):Clone()
-				label.Parent = new_tab
-				label.Text = label_text
-				label.Size = UDim2.new(1, -10, 0, 20)
-				label.TextWrapped = true
-				label.AutomaticSize = Enum.AutomaticSize.Y
-				label.ZIndex = label.ZIndex + (windows * 10)
-
-				registerThemeListener(function(t)
-					label.Font = t.font_body
-					label.TextColor3 = t.text_color
-				end)
-
-				return label
-			end
-
-			function tab_data:AddButton(button_text, callback)
-				button_text = tostring(button_text or "New Button")
-				callback = typeof(callback) == "function" and callback or function() end
-
-				local button = prefabs:FindFirstChild("Button"):Clone()
-				button.Parent = new_tab
-				button.Text = button_text
-				button.Size = UDim2.new(0, gNameLen(button), 0, 20)
-				button.ZIndex = button.ZIndex + (windows * 10)
-				button:GetChildren()[1].ZIndex = button:GetChildren()[1].ZIndex + (windows * 10)
-
-				registerThemeListener(function(t)
-					button.Font = t.font_body
-					button.TextColor3 = t.text_color
-					if button and button:GetChildren()[1] then
-						button:GetChildren()[1].ImageColor3 = t.main_color
-					end
-				end)
-
-				runtime:Connect(button.MouseButton1Click, function()
-					ripple(button, mouse.X, mouse.Y)
-					pcall(callback)
-				end)
-
-				return button
-			end
-
-			function tab_data:AddSwitch(switch_text, callback)
-				local switch_data = {}
-				switch_text = tostring(switch_text or "New Switch")
-				callback = typeof(callback) == "function" and callback or function() end
-
-				local switch = prefabs:FindFirstChild("Switch"):Clone()
-				switch.Parent = new_tab
-				switch:FindFirstChild("Title").Text = switch_text
-				switch:FindFirstChild("Title").ZIndex = switch:FindFirstChild("Title").ZIndex + (windows * 10)
-				switch.ZIndex = switch.ZIndex + (windows * 10)
-				switch:GetChildren()[1].ZIndex = switch:GetChildren()[1].ZIndex + (windows * 10)
-
-				registerThemeListener(function(t)
-					switch:FindFirstChild("Title").Font = t.font_title
-					switch:FindFirstChild("Title").TextColor3 = t.text_color
-					if switch and switch:GetChildren()[1] then
-						switch:GetChildren()[1].ImageColor3 = t.main_color
-					end
-				end)
-
-				local toggled = false
-				runtime:AddCleanup(function()
-					if toggled then
-						toggled = false
-						pcall(callback, false)
-					end
-				end)
-				runtime:Connect(switch.MouseButton1Click, function()
-					toggled = not toggled
-					switch.Text = toggled and utf8.char(10003) or ""
-					pcall(callback, toggled)
-				end)
-
-				function switch_data:Set(bool)
-					if not runtime.Alive then return end
-					toggled = (typeof(bool) == "boolean") and bool or false
-					switch.Text = toggled and utf8.char(10003) or ""
-					pcall(callback, toggled)
-				end
-
-				return switch_data, switch
-			end
-
-			function tab_data:AddTextBox(textbox_text, callback, textbox_options)
-				textbox_text = tostring(textbox_text or "New TextBox")
-				callback = typeof(callback) == "function" and callback or function() end
-				textbox_options = typeof(textbox_options) == "table" and textbox_options or {["clear"] = true}
-				textbox_options = {
-					["clear"] = ((textbox_options.clear) == true)
-				}
-
-				local textbox = prefabs:FindFirstChild("TextBox"):Clone()
-				textbox.Parent = new_tab
-				textbox.PlaceholderText = textbox_text
-				textbox.ZIndex = textbox.ZIndex + (windows * 10)
-				textbox:GetChildren()[1].ZIndex = textbox:GetChildren()[1].ZIndex + (windows * 10)
-
-				registerThemeListener(function(t)
-					textbox.Font = t.font_body
-					textbox.TextColor3 = t.text_color
-				end)
-
-				runtime:Connect(textbox.FocusLost, function(ep)
-					if ep then
-						if #textbox.Text > 0 then
-							pcall(callback, textbox.Text)
-							if textbox_options.clear then
-								textbox.Text = ""
-							end
+				local function show()
+					if dropdown_open then return end
+					for i, v in pairs(tab_buttons:GetChildren()) do
+						if not (v:IsA("UIListLayout")) then
+							v:GetChildren()[1].ImageColor3 = Color3.fromRGB(52, 53, 56)
+							Resize(v, {Size = UDim2.new(0, v.AbsoluteSize.X, 0, 20)}, options.tween_time)
 						end
 					end
+					for i, v in pairs(tabs:GetChildren()) do
+						v.Visible = false
+					end
+
+					Resize(new_button, {Size = UDim2.new(0, new_button.AbsoluteSize.X, 0, 25)}, options.tween_time)
+					new_button:GetChildren()[1].ImageColor3 = Color3.fromRGB(73, 75, 79)
+					new_tab.Visible = true
+				end
+
+				runtime:Connect(new_button.MouseButton1Click, function()
+					show()
 				end)
 
-				return textbox
-			end
+				function tab_data:Show()
+					show()
+				end
 
-			function tab_data:AddSlider(slider_text, callback, slider_options)
-				local slider_data = {}
-				slider_text = tostring(slider_text or "New Slider")
-				callback = typeof(callback) == "function" and callback or function() end
-				slider_options = typeof(slider_options) == "table" and slider_options or {}
-				slider_options = {
-					["min"] = slider_options.min or 0,
-					["max"] = slider_options.max or 100,
-					["readonly"] = slider_options.readonly or false,
-				}
+				do
 
-				local slider = prefabs:FindFirstChild("Slider"):Clone()
-				slider.Parent = new_tab
-				slider.ZIndex = slider.ZIndex + (windows * 10)
+					function tab_data:AddLabel(label_text)
+						label_text = tostring(label_text or "New Label")
 
-				local title = slider:FindFirstChild("Title")
-				local indicator = slider:FindFirstChild("Indicator")
-				local value = slider:FindFirstChild("Value")
-				title.ZIndex = title.ZIndex + (windows * 10)
-				indicator.ZIndex = indicator.ZIndex + (windows * 10)
-				value.ZIndex = value.ZIndex + (windows * 10)
-				title.Text = slider_text
+						local label = prefabs:FindFirstChild("Label"):Clone()
 
-				registerThemeListener(function(t)
-					title.Font = t.font_body
-					value.Font = t.font_body
-				end)
+						label.Parent = new_tab
+						label.Text = label_text
+						label.Size = UDim2.new(1, -10, 0, 20)
+						label.TextWrapped = true
+						label.AutomaticSize = Enum.AutomaticSize.Y
+						label.ZIndex = label.ZIndex + (windows * 10)
 
-				local Entered = false
-				runtime:Connect(slider.MouseEnter, function()
-					Entered = true
-					Window.Draggable = false
-				end)
-				runtime:Connect(slider.MouseLeave, function()
-					Entered = false
-					Window.Draggable = true
-				end)
+						return label
+					end
 
-				local Held = false
-				runtime:Connect(UIS.InputBegan, function(inputObject)
-					if inputObject.UserInputType == Enum.UserInputType.MouseButton1 then
-						Held = true
+					function tab_data:AddButton(button_text, callback)
+						button_text = tostring(button_text or "New Button")
+						callback = typeof(callback) == "function" and callback or function()end
+
+						local button = prefabs:FindFirstChild("Button"):Clone()
+
+						button.Parent = new_tab
+						button.Text = button_text
+						button.Size = UDim2.new(0, gNameLen(button), 0, 20)
+						button.ZIndex = button.ZIndex + (windows * 10)
+						button:GetChildren()[1].ZIndex = button:GetChildren()[1].ZIndex + (windows * 10)
 
 						runtime:Spawn(function()
-							if Entered and not slider_options.readonly then
-								while Held and (not dropdown_open) do
-									local mouse_location = gMouse()
-									local x = (slider.AbsoluteSize.X - (slider.AbsoluteSize.X - ((mouse_location.X - slider.AbsolutePosition.X)) + 1)) / slider.AbsoluteSize.X
+							while true do
+								if button and button:GetChildren()[1] then
+									button:GetChildren()[1].ImageColor3 = options.main_color
+								end
+								RS.Heartbeat:Wait()
+							end
+						end)
 
-									local min = 0
-									local max = 1
-									local size = min
-									if x >= min and x <= max then
-										size = x
-									elseif x < min then
-										size = min
-									elseif x > max then
-										size = max
+						runtime:Connect(button.MouseButton1Click, function()
+							ripple(button, mouse.X, mouse.Y)
+							pcall(callback)
+						end)
+
+						return button
+					end
+
+					function tab_data:AddSwitch(switch_text, callback)
+						local switch_data = {}
+
+						switch_text = tostring(switch_text or "New Switch")
+						callback = typeof(callback) == "function" and callback or function()end
+
+						local switch = prefabs:FindFirstChild("Switch"):Clone()
+
+						switch.Parent = new_tab
+						switch:FindFirstChild("Title").Text = switch_text
+
+						switch:FindFirstChild("Title").ZIndex = switch:FindFirstChild("Title").ZIndex + (windows * 10)
+						switch.ZIndex = switch.ZIndex + (windows * 10)
+						switch:GetChildren()[1].ZIndex = switch:GetChildren()[1].ZIndex + (windows * 10)
+
+						runtime:Spawn(function()
+							while true do
+								if switch and switch:GetChildren()[1] then
+									switch:GetChildren()[1].ImageColor3 = options.main_color
+								end
+								RS.Heartbeat:Wait()
+							end
+						end)
+
+						local toggled = false
+						runtime:AddCleanup(function()
+							if toggled then
+								toggled = false
+								pcall(callback, false)
+							end
+						end)
+						runtime:Connect(switch.MouseButton1Click, function()
+							toggled = not toggled
+							switch.Text = toggled and utf8.char(10003) or ""
+							pcall(callback, toggled)
+						end)
+
+						function switch_data:Set(bool)
+							if not runtime.Alive then return end
+							toggled = (typeof(bool) == "boolean") and bool or false
+							switch.Text = toggled and utf8.char(10003) or ""
+							pcall(callback,toggled)
+						end
+
+						return switch_data, switch
+					end
+
+					function tab_data:AddTextBox(textbox_text, callback, textbox_options)
+						textbox_text = tostring(textbox_text or "New TextBox")
+						callback = typeof(callback) == "function" and callback or function()end
+						textbox_options = typeof(textbox_options) == "table" and textbox_options or {["clear"] = true}
+						textbox_options = {
+							["clear"] = ((textbox_options.clear) == true)
+						}
+
+						local textbox = prefabs:FindFirstChild("TextBox"):Clone()
+
+						textbox.Parent = new_tab
+						textbox.PlaceholderText = textbox_text
+						textbox.ZIndex = textbox.ZIndex + (windows * 10)
+						textbox:GetChildren()[1].ZIndex = textbox:GetChildren()[1].ZIndex + (windows * 10)
+
+						runtime:Connect(textbox.FocusLost, function(ep)
+							if ep then
+								if #textbox.Text > 0 then
+									pcall(callback, textbox.Text)
+									if textbox_options.clear then
+										textbox.Text = ""
+									end
+								end
+							end
+						end)
+
+						return textbox
+					end
+
+					function tab_data:AddSlider(slider_text, callback, slider_options)
+						local slider_data = {}
+
+						slider_text = tostring(slider_text or "New Slider")
+						callback = typeof(callback) == "function" and callback or function()end
+						slider_options = typeof(slider_options) == "table" and slider_options or {}
+						slider_options = {
+							["min"] = slider_options.min or 0,
+							["max"] = slider_options.max or 100,
+							["readonly"] = slider_options.readonly or false,
+						}
+
+						local slider = prefabs:FindFirstChild("Slider"):Clone()
+
+						slider.Parent = new_tab
+						slider.ZIndex = slider.ZIndex + (windows * 10)
+
+						local title = slider:FindFirstChild("Title")
+						local indicator = slider:FindFirstChild("Indicator")
+						local value = slider:FindFirstChild("Value")
+						title.ZIndex = title.ZIndex + (windows * 10)
+						indicator.ZIndex = indicator.ZIndex + (windows * 10)
+						value.ZIndex = value.ZIndex + (windows * 10)
+
+						title.Text = slider_text
+
+						do
+							local Entered = false
+							runtime:Connect(slider.MouseEnter, function()
+								Entered = true
+								Window.Draggable = false
+							end)
+							runtime:Connect(slider.MouseLeave, function()
+								Entered = false
+								Window.Draggable = true
+							end)
+
+							local Held = false
+							runtime:Connect(UIS.InputBegan, function(inputObject)
+								if inputObject.UserInputType == Enum.UserInputType.MouseButton1 then
+									Held = true
+
+									runtime:Spawn(function()
+										if Entered and not slider_options.readonly then
+											while Held and (not dropdown_open) do
+												local mouse_location = gMouse()
+												local x = (slider.AbsoluteSize.X - (slider.AbsoluteSize.X - ((mouse_location.X - slider.AbsolutePosition.X)) + 1)) / slider.AbsoluteSize.X
+
+												local min = 0
+												local max = 1
+
+												local size = min
+												if x >= min and x <= max then
+													size = x
+												elseif x < min then
+													size = min
+												elseif x > max then
+													size = max
+												end
+
+												Resize(indicator, {Size = UDim2.new(size or min, 0, 0, 20)}, options.tween_time)
+												local p = math.floor((size or min) * 100)
+
+												local maxv = slider_options.max
+												local minv = slider_options.min
+												local diff = maxv - minv
+
+												local sel_value = math.floor(((diff / 100) * p) + minv)
+
+												value.Text = tostring(sel_value)
+												pcall(callback, sel_value)
+
+												RS.Heartbeat:Wait()
+											end
+										end
+									end)
+								end
+							end)
+							runtime:Connect(UIS.InputEnded, function(inputObject)
+								if inputObject.UserInputType == Enum.UserInputType.MouseButton1 then
+									Held = false
+								end
+							end)
+
+							function slider_data:Set(new_value)
+								new_value = tonumber(new_value) or 0
+								new_value = (((new_value >= 0 and new_value <= 100) and new_value) / 100)
+
+								Resize(indicator, {Size = UDim2.new(new_value or 0, 0, 0, 20)}, options.tween_time)
+								local p = math.floor((new_value or 0) * 100)
+
+								local maxv = slider_options.max
+								local minv = slider_options.min
+								local diff = maxv - minv
+
+								local sel_value = math.floor(((diff / 100) * p) + minv)
+
+								value.Text = tostring(sel_value)
+								pcall(callback, sel_value)
+							end
+
+							slider_data:Set(slider_options["min"])
+						end
+
+						return slider_data, slider
+					end
+
+					function tab_data:AddKeybind(keybind_name, callback, keybind_options)
+						local keybind_data = {}
+
+						keybind_name = tostring(keybind_name or "New Keybind")
+						callback = typeof(callback) == "function" and callback or function()end
+						keybind_options = typeof(keybind_options) == "table" and keybind_options or {}
+						keybind_options = {
+							["standard"] = keybind_options.standard or Enum.KeyCode.RightShift,
+						}
+
+						local keybind = prefabs:FindFirstChild("Keybind"):Clone()
+						local input = keybind:FindFirstChild("Input")
+						local title = keybind:FindFirstChild("Title")
+						keybind.ZIndex = keybind.ZIndex + (windows * 10)
+						input.ZIndex = input.ZIndex + (windows * 10)
+						input:GetChildren()[1].ZIndex = input:GetChildren()[1].ZIndex + (windows * 10)
+						title.ZIndex = title.ZIndex + (windows * 10)
+
+						keybind.Parent = new_tab
+						title.Text = "  " .. keybind_name
+						keybind.Size = UDim2.new(0, gNameLen(title) + 80, 0, 20)
+
+						local shortkeys = {
+							RightControl = 'RightCtrl',
+							LeftControl = 'LeftCtrl',
+							LeftShift = 'LShift',
+							RightShift = 'RShift',
+							MouseButton1 = "Mouse1",
+							MouseButton2 = "Mouse2"
+						}
+
+						local keybind = keybind_options.standard
+
+						function keybind_data:SetKeybind(Keybind)
+							local key = shortkeys[Keybind.Name] or Keybind.Name
+							input.Text = key
+							keybind = Keybind
+						end
+
+						runtime:Connect(UIS.InputBegan, function(a, b)
+							if checks.binding then
+								runtime:Spawn(function()
+									wait()
+									checks.binding = false
+								end)
+								return
+							end
+							if a.KeyCode == keybind and not b then
+								pcall(callback, keybind)
+							end
+						end)
+
+						keybind_data:SetKeybind(keybind_options.standard)
+
+						runtime:Connect(input.MouseButton1Click, function()
+							if checks.binding then return end
+							input.Text = "..."
+							checks.binding = true
+							local a, b = UIS.InputBegan:Wait()
+							keybind_data:SetKeybind(a.KeyCode)
+						end)
+
+						return keybind_data, keybind
+					end
+
+					function tab_data:AddDropdown(dropdown_name, callback)
+						local dropdown_data = {}
+						local dropdown_objects = {}
+						dropdown_name = tostring(dropdown_name or "New Dropdown")
+						callback = typeof(callback) == "function" and callback or function()end
+
+						local dropdown = prefabs:FindFirstChild("Dropdown"):Clone()
+						local box = dropdown:FindFirstChild("Box")
+						local objects = box:FindFirstChild("Objects")
+						local indicator = dropdown:FindFirstChild("Indicator")
+						dropdown.ZIndex = dropdown.ZIndex + (windows * 10)
+						box.ZIndex = box.ZIndex + (windows * 10)
+						objects.ZIndex = objects.ZIndex + (windows * 10)
+						indicator.ZIndex = indicator.ZIndex + (windows * 10)
+						dropdown:GetChildren()[3].ZIndex = dropdown:GetChildren()[3].ZIndex + (windows * 10)
+
+						dropdown.Parent = new_tab
+						dropdown.Text = "      " .. dropdown_name
+						box.Size = UDim2.new(1, 0, 0, 0)
+
+						local open = false
+						runtime:Connect(dropdown.MouseButton1Click, function()
+							open = not open
+
+							local len = (#objects:GetChildren() - 1) * 20
+							if #objects:GetChildren() - 1 >= 10 then
+								len = 10 * 20
+								objects.CanvasSize = UDim2.new(0, 0, (#objects:GetChildren() - 1) * 0.1, 0)
+							end
+
+							if open then
+								if dropdown_open then return end
+								dropdown_open = true
+								Resize(box, {Size = UDim2.new(1, 0, 0, len)}, options.tween_time)
+								Resize(indicator, {Rotation = 90}, options.tween_time)
+							else
+								dropdown_open = false
+								Resize(box, {Size = UDim2.new(1, 0, 0, 0)}, options.tween_time)
+								Resize(indicator, {Rotation = -90}, options.tween_time)
+							end
+
+						end)
+
+						function dropdown_data:Add(n)
+							local object_data = {}
+							n = tostring(n or "New Object")
+							if not objects or not objects.Parent then
+								return object_data
+							end
+
+							local named_objects = dropdown_objects[n]
+							local existing_object
+							if named_objects then
+								for index = #named_objects, 1, -1 do
+									local current_object = named_objects[index]
+									if not current_object or not current_object.Parent then
+										table.remove(named_objects, index)
+									elseif existing_object then
+										current_object:Destroy()
+										table.remove(named_objects, index)
+									else
+										existing_object = current_object
+									end
+								end
+
+								if #named_objects == 0 then
+									dropdown_objects[n] = nil
+								end
+							end
+
+							if existing_object then
+								function object_data:Remove()
+									dropdown_data:Remove(n)
+								end
+								return existing_object, object_data
+							end
+
+							local object_prefab = prefabs and prefabs:FindFirstChild("DropdownButton")
+							if not object_prefab then
+								return object_data
+							end
+
+							local object = object_prefab:Clone()
+
+							object.Parent = objects
+							object.Text = n
+							object.ZIndex = object.ZIndex + (windows * 10)
+							dropdown_objects[n] = dropdown_objects[n] or {}
+							table.insert(dropdown_objects[n], object)
+
+							runtime:Connect(object.MouseEnter, function()
+								object.BackgroundColor3 = options.main_color
+							end)
+							runtime:Connect(object.MouseLeave, function()
+								object.BackgroundColor3 = Color3.fromRGB(33, 34, 36)
+							end)
+
+							if open then
+								local len = (#objects:GetChildren() - 1) * 20
+								if #objects:GetChildren() - 1 >= 10 then
+									len = 10 * 20
+									objects.CanvasSize = UDim2.new(0, 0, (#objects:GetChildren() - 1) * 0.1, 0)
+								end
+								Resize(box, {Size = UDim2.new(1, 0, 0, len)}, options.tween_time)
+							end
+
+							runtime:Connect(object.MouseButton1Click, function()
+								if dropdown_open then
+									dropdown.Text = "      [ " .. n .. " ]"
+									dropdown_open = false
+									open = false
+									Resize(box, {Size = UDim2.new(1, 0, 0, 0)}, options.tween_time)
+									Resize(indicator, {Rotation = -90}, options.tween_time)
+									pcall(callback, n)
+								end
+							end)
+
+							function object_data:Remove()
+								if object.Parent then object:Destroy() end
+								local named_objects = dropdown_objects[n]
+								if named_objects then
+									for index = #named_objects, 1, -1 do
+										if named_objects[index] == object then
+											table.remove(named_objects, index)
+										end
+									end
+									if #named_objects == 0 then dropdown_objects[n] = nil end
+								end
+							end
+
+							return object, object_data
+						end
+
+						function dropdown_data:Remove(n)
+							n = tostring(n or "New Object")
+							local named_objects = dropdown_objects[n]
+							if not named_objects then return end
+
+							for _, object in ipairs(named_objects) do
+								if object.Parent then object:Destroy() end
+							end
+							dropdown_objects[n] = nil
+							if dropdown.Text == "      [ " .. n .. " ]" then
+								dropdown.Text = "      " .. dropdown_name
+							end
+							if open then
+								open = false
+								dropdown_open = false
+								Resize(box, {Size = UDim2.new(1, 0, 0, 0)}, options.tween_time)
+								Resize(indicator, {Rotation = -90}, options.tween_time)
+							end
+						end
+
+						function dropdown_data:Clear()
+							for name, named_objects in pairs(dropdown_objects) do
+								for _, object in ipairs(named_objects) do
+									if object.Parent then object:Destroy() end
+								end
+								dropdown_objects[name] = nil
+							end
+							dropdown.Text = "      " .. dropdown_name
+							if open then
+								open = false
+								dropdown_open = false
+								Resize(box, {Size = UDim2.new(1, 0, 0, 0)}, options.tween_time)
+								Resize(indicator, {Rotation = -90}, options.tween_time)
+							end
+						end
+
+						function dropdown_data:Refresh(items)
+							dropdown_data:Clear()
+							for _, item in ipairs(items or {}) do
+								dropdown_data:Add(item)
+							end
+						end
+
+						return dropdown_data, dropdown
+					end
+
+					function tab_data:AddColorPicker(callback)
+						local color_picker_data = {}
+						callback = typeof(callback) == "function" and callback or function()end
+
+						local color_picker = prefabs:FindFirstChild("ColorPicker"):Clone()
+
+						color_picker.Parent = new_tab
+						color_picker.ZIndex = color_picker.ZIndex + (windows * 10)
+
+						local palette = color_picker:FindFirstChild("Palette")
+						local sample = color_picker:FindFirstChild("Sample")
+						local saturation = color_picker:FindFirstChild("Saturation")
+						palette.ZIndex = palette.ZIndex + (windows * 10)
+						sample.ZIndex = sample.ZIndex + (windows * 10)
+						saturation.ZIndex = saturation.ZIndex + (windows * 10)
+
+						do
+							local h = 0
+							local s = 1
+							local v = 1
+
+							local function update()
+								local color = Color3.fromHSV(h, s, v)
+								sample.ImageColor3 = color
+								saturation.ImageColor3 = Color3.fromHSV(h, 1, 1)
+								pcall(callback, color)
+							end
+
+							do
+								local color = Color3.fromHSV(h, s, v)
+								sample.ImageColor3 = color
+								saturation.ImageColor3 = Color3.fromHSV(h, 1, 1)
+							end
+
+							local Entered1, Entered2 = false, false
+							runtime:Connect(palette.MouseEnter, function()
+								Window.Draggable = false
+								Entered1 = true
+							end)
+							runtime:Connect(palette.MouseLeave, function()
+								Window.Draggable = true
+								Entered1 = false
+							end)
+							runtime:Connect(saturation.MouseEnter, function()
+								Window.Draggable = false
+								Entered2 = true
+							end)
+							runtime:Connect(saturation.MouseLeave, function()
+								Window.Draggable = true
+								Entered2 = false
+							end)
+
+							local palette_indicator = palette:FindFirstChild("Indicator")
+							local saturation_indicator = saturation:FindFirstChild("Indicator")
+							palette_indicator.ZIndex = palette_indicator.ZIndex + (windows * 10)
+							saturation_indicator.ZIndex = saturation_indicator.ZIndex + (windows * 10)
+
+							local Held = false
+							runtime:Connect(UIS.InputBegan, function(inputObject)
+								if inputObject.UserInputType == Enum.UserInputType.MouseButton1 then
+									Held = true
+
+									runtime:Spawn(function()
+										while Held and Entered1 and (not dropdown_open) do
+											local mouse_location = gMouse()
+
+											local x = ((palette.AbsoluteSize.X - (mouse_location.X - palette.AbsolutePosition.X)) + 1)
+											local y = ((palette.AbsoluteSize.Y - (mouse_location.Y - palette.AbsolutePosition.Y)) + 1.5)
+
+											local color = Color3.fromHSV(x / 100, y / 100, 0)
+											h = x / 100
+											s = y / 100
+
+											Resize(palette_indicator, {Position = UDim2.new(0, math.abs(x - 100) - (palette_indicator.AbsoluteSize.X / 2), 0, math.abs(y - 100) - (palette_indicator.AbsoluteSize.Y / 2))}, options.tween_time)
+
+											update()
+											RS.Heartbeat:Wait()
+										end
+
+										while Held and Entered2 and (not dropdown_open) do
+											local mouse_location = gMouse()
+											local y = ((palette.AbsoluteSize.Y - (mouse_location.Y - palette.AbsolutePosition.Y)) + 1.5)
+											v = y / 100
+
+											Resize(saturation_indicator, {Position = UDim2.new(0, 0, 0, math.abs(y - 100))}, options.tween_time)
+
+											update()
+											RS.Heartbeat:Wait()
+										end
+									end)
+								end
+							end)
+							runtime:Connect(UIS.InputEnded, function(inputObject)
+								if inputObject.UserInputType == Enum.UserInputType.MouseButton1 then
+									Held = false
+								end
+							end)
+
+							function color_picker_data:Set(color)
+								color = typeof(color) == "Color3" and color or Color3.new(1, 1, 1)
+								local h2, s2, v2 = rgbtohsv(color.r * 255, color.g * 255, color.b * 255)
+								sample.ImageColor3 = color
+								saturation.ImageColor3 = Color3.fromHSV(h2, 1, 1)
+								pcall(callback, color)
+							end
+						end
+
+						return color_picker_data, color_picker
+					end
+
+					function tab_data:AddConsole(console_options)
+						local console_data = {}
+
+						console_options = typeof(console_options) == "table" and console_options or {["readonly"] = true,["full"] = false,}
+						console_options = {
+							["y"] = tonumber(console_options.y) or 200,
+							["source"] = console_options.source or "Logs",
+							["readonly"] = ((console_options.readonly) == true),
+							["full"] = ((console_options.full) == true),
+						}
+
+						local console = prefabs:FindFirstChild("Console"):Clone()
+
+						console.Parent = new_tab
+						console.ZIndex = console.ZIndex + (windows * 10)
+						console.Size = UDim2.new(1, 0, console_options.full and 1 or 0, console_options.y)
+
+						local sf = console:GetChildren()[1]
+						local Source = sf:FindFirstChild("Source")
+						local Lines = sf:FindFirstChild("Lines")
+						Source.ZIndex = Source.ZIndex + (windows * 10)
+						Lines.ZIndex = Lines.ZIndex + (windows * 10)
+
+						Source.TextEditable = not console_options.readonly
+
+						do
+							for i,v in pairs(Source:GetChildren()) do
+								v.ZIndex = v.ZIndex + (windows * 10) + 1
+							end
+						end
+						Source.Comments.ZIndex = Source.Comments.ZIndex + 1
+
+						do
+							local lua_keywords = {"and", "break", "do", "else", "elseif", "end", "false", "for", "function", "goto", "if", "in", "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while"}
+							local global_env = {"getrawmetatable", "newcclosure", "islclosure", "setclipboard", "game", "workspace", "script", "math", "string", "table", "print", "wait", "BrickColor", "Color3", "next", "pairs", "ipairs", "select", "unpack", "Instance", "Vector2", "Vector3", "CFrame", "Ray", "UDim2", "Enum", "assert", "error", "warn", "tick", "loadstring", "_G", "shared", "getfenv", "setfenv", "newproxy", "setmetatable", "getmetatable", "os", "debug", "pcall", "ypcall", "xpcall", "rawequal", "rawset", "rawget", "tonumber", "tostring", "type", "typeof", "_VERSION", "coroutine", "delay", "require", "spawn", "LoadLibrary", "settings", "stats", "time", "UserSettings", "version", "Axes", "ColorSequence", "Faces", "ColorSequenceKeypoint", "NumberRange", "NumberSequence", "NumberSequenceKeypoint", "gcinfo", "elapsedTime", "collectgarbage", "PhysicalProperties", "Rect", "Region3", "Region3int16", "UDim", "Vector2int16", "Vector3int16", "load", "fire", "Fire"}
+
+							local Highlight = function(string, keywords)
+								local K = {}
+								local S = string
+								local Token =
+									{
+									["="] = true,
+									["."] = true,
+									[","] = true,
+									["("] = true,
+									[")"] = true,
+									["["] = true,
+									["]"] = true,
+									["{"] = true,
+									["}"] = true,
+									[":"] = true,
+									["*"] = true,
+									["/"] = true,
+									["+"] = true,
+									["-"] = true,
+									["%"] = true,
+									[";"] = true,
+									["~"] = true
+								}
+								for i, v in pairs(keywords) do
+									K[v] = true
+								end
+								S = S:gsub(".", function(c)
+									if Token[c] ~= nil then
+										return "\32"
+									else
+										return c
+									end
+								end)
+								S = S:gsub("%S+", function(c)
+									if K[c] ~= nil then
+										return c
+									else
+										return (" "):rep(#c)
+									end
+								end)
+
+								return S
+							end
+
+							local hTokens = function(string)
+								local Token =
+									{
+									["="] = true,
+									["."] = true,
+									[","] = true,
+									["("] = true,
+									[")"] = true,
+									["["] = true,
+									["]"] = true,
+									["{"] = true,
+									["}"] = true,
+									[":"] = true,
+									["*"] = true,
+									["/"] = true,
+									["+"] = true,
+									["-"] = true,
+									["%"] = true,
+									[";"] = true,
+									["~"] = true
+								}
+								local A = ""
+								string:gsub(".", function(c)
+									if Token[c] ~= nil then
+										A = A .. c
+									elseif c == "\n" then
+										A = A .. "\n"
+									elseif c == "\t" then
+										A = A .. "\t"
+									else
+										A = A .. "\32"
+									end
+								end)
+
+								return A
+							end
+
+							local strings = function(string)
+								local highlight = ""
+								local quote = false
+								string:gsub(".", function(c)
+									if quote == false and c == "\34" then
+										quote = true
+									elseif quote == true and c == "\34" then
+										quote = false
+									end
+									if quote == false and c == "\34" then
+										highlight = highlight .. "\34"
+									elseif c == "\n" then
+										highlight = highlight .. "\n"
+									elseif c == "\t" then
+										highlight = highlight .. "\t"
+									elseif quote == true then
+										highlight = highlight .. c
+									elseif quote == false then
+										highlight = highlight .. "\32"
+									end
+								end)
+
+								return highlight
+							end
+
+							local info = function(string)
+								local highlight = ""
+								local quote = false
+								string:gsub(".", function(c)
+									if quote == false and c == "[" then
+										quote = true
+									elseif quote == true and c == "]" then
+										quote = false
+									end
+									if quote == false and c == "]" then
+										highlight = highlight .. "]"
+									elseif c == "\n" then
+										highlight = highlight .. "\n"
+									elseif c == "\t" then
+										highlight = highlight .. "\t"
+									elseif quote == true then
+										highlight = highlight .. c
+									elseif quote == false then
+										highlight = highlight .. "\32"
+									end
+								end)
+
+								return highlight
+							end
+
+							local comments = function(string)
+								local ret = ""
+								string:gsub("[^\r\n]+", function(c)
+									local comm = false
+									local i = 0
+									c:gsub(".", function(n)
+										i = i + 1
+										if c:sub(i, i + 1) == "--" then
+											comm = true
+										end
+										if comm == true then
+											ret = ret .. n
+										else
+											ret = ret .. "\32"
+										end
+									end)
+									ret = ret
+								end)
+
+								return ret
+							end
+
+							local numbers = function(string)
+								local A = ""
+								string:gsub(".", function(c)
+									if tonumber(c) ~= nil then
+										A = A .. c
+									elseif c == "\n" then
+										A = A .. "\n"
+									elseif c == "\t" then
+										A = A .. "\t"
+									else
+										A = A .. "\32"
+									end
+								end)
+
+								return A
+							end
+
+                            local function highlight_logs(s)
+                                local result = s
+                                for _, name in ipairs({"print","warn","error","console.log"}) do
+                                    local pat = name:gsub("%.", "%%.")
+                                    result = result:gsub(pat .. "%s*%b()", '<font color="rgb(130,255,170)">%0</font>')
+                                end
+                                return result
+                            end
+
+							local highlight_lua = function(type)
+								if type == "Text" then
+									Source.Text = Source.Text:gsub("\13", "")
+									Source.Text = Source.Text:gsub("\t", "      ")
+									local s = Source.Text
+
+									Source.Keywords.Text = Highlight(s, lua_keywords)
+									Source.Globals.Text = Highlight(s, global_env)
+									Source.RemoteHighlight.Text = Highlight(s, {"FireServer", "fireServer", "InvokeServer", "invokeServer"})
+									Source.Tokens.Text = hTokens(s)
+									Source.Numbers.Text = numbers(s)
+									Source.Strings.Text = strings(s)
+									Source.Comments.Text = comments(s)
+
+									local lin = 1
+									s:gsub("\n", function()
+										lin = lin + 1
+									end)
+
+									Lines.Text = ""
+									for i = 1, lin do
+										Lines.Text = Lines.Text .. i .. "\n"
 									end
 
-									Resize(indicator, {Size = UDim2.new(size or min, 0, 0, 20)}, opts.tween_time)
-									local p = math.floor((size or min) * 100)
+									sf.CanvasSize = UDim2.new(0, 0, lin * 0.153846154, 0)
+								end
 
-									local maxv = slider_options.max
-									local minv = slider_options.min
-									local diff = maxv - minv
-									local sel_value = math.floor(((diff / 100) * p) + minv)
+								local highlight_logs = function(type)
+                                    if type == "Text" then
+                                        Source.Text = Source.Text:gsub("\13", "")
+                                        Source.Text = Source.Text:gsub("\t", "      ")
+                                        local s = Source.Text
+                                        Source.Keywords.Text     = Highlight(s, lua_keywords)
+                                        Source.Globals.Text      = Highlight(s, global_env)
+                                        Source.RemoteHighlight.Text = Highlight(s, {"FireServer", "fireServer", "InvokeServer", "invokeServer"})
+                                        Source.Tokens.Text       = hTokens(s)
+                                        Source.Numbers.Text      = numbers(s)
+                                        Source.Strings.Text      = strings(s)
+                                        Source.Comments.Text     = comments(s)
+                                        Source.Logs.Text = highlight_logs(s)
+                                        local lin = 1
+                                        s:gsub("\n", function() lin = lin + 1 end)
+                                        Lines.Text = ""
+                                        for i = 1, lin do
+                                            Lines.Text = Lines.Text .. i .. "\n"
+                                        end
 
-									value.Text = tostring(sel_value)
-									pcall(callback, sel_value)
+                                        sf.CanvasSize = UDim2.new(0, 0, lin * 0.153846154, 0)
+                                    end
+								end
+								if type == "Text" then
+									Source.Text = Source.Text:gsub("\13", "")
+									Source.Text = Source.Text:gsub("\t", "      ")
+									local s = Source.Text
 
-									RS.Heartbeat:Wait()
+									Source.Info.Text = info(s)
+
+									local lin = 1
+									s:gsub("\n", function()
+										lin = lin + 1
+									end)
+
+									sf.CanvasSize = UDim2.new(0, 0, lin * 0.153846154, 0)
 								end
 							end
-						end)
+
+							if console_options.source == "Lua" then
+								highlight_lua("Text")
+								runtime:Connect(Source.Changed, highlight_lua)
+							elseif console_options.source == "Logs" then
+								Lines.Visible = false
+
+								highlight_logs("Text")
+								runtime:Connect(Source.Changed, highlight_logs)
+							end
+
+							function console_data:Set(code)
+								Source.Text = tostring(code)
+							end
+
+							function console_data:Get()
+								return Source.Text
+							end
+
+							function console_data:Log(msg)
+								Source.Text = Source.Text .. "[*] " .. tostring(msg) .. "\n"
+							end
+
+						end
+
+						return console_data, console
 					end
-				end)
-				runtime:Connect(UIS.InputEnded, function(inputObject)
-					if inputObject.UserInputType == Enum.UserInputType.MouseButton1 then
-						Held = false
+
+					function tab_data:AddHorizontalAlignment()
+						local ha_data = {}
+
+						local ha = prefabs:FindFirstChild("HorizontalAlignment"):Clone()
+						ha.Parent = new_tab
+
+						function ha_data:AddButton(...)
+							local data, object
+							local ret = {tab_data:AddButton(...)}
+							if typeof(ret[1]) == "table" then
+								data = ret[1]
+								object = ret[2]
+								object.Parent = ha
+								return data, object
+							else
+								object = ret[1]
+								object.Parent = ha
+								return object
+							end
+						end
+
+						return ha_data, ha
 					end
-				end)
 
-				function slider_data:Set(new_value)
-					new_value = tonumber(new_value) or 0
-					new_value = (((new_value >= 0 and new_value <= 100) and new_value) / 100)
+					function tab_data:AddFolder(folder_name)
+						local folder_data = {}
 
-					Resize(indicator, {Size = UDim2.new(new_value or 0, 0, 0, 20)}, opts.tween_time)
-					local p = math.floor((new_value or 0) * 100)
+						folder_name = tostring(folder_name or "New Folder")
 
-					local maxv = slider_options.max
-					local minv = slider_options.min
-					local diff = maxv - minv
-					local sel_value = math.floor(((diff / 100) * p) + minv)
+						local folder = prefabs:FindFirstChild("Folder"):Clone()
+						local button = folder:FindFirstChild("Button")
+						local objects = folder:FindFirstChild("Objects")
+						local toggle = button:FindFirstChild("Toggle")
+						folder.ZIndex = folder.ZIndex + (windows * 10)
+						button.ZIndex = button.ZIndex + (windows * 10)
+						objects.ZIndex = objects.ZIndex + (windows * 10)
+						toggle.ZIndex = toggle.ZIndex + (windows * 10)
+						button:GetChildren()[1].ZIndex = button:GetChildren()[1].ZIndex + (windows * 10)
 
-					value.Text = tostring(sel_value)
-					pcall(callback, sel_value)
-				end
+						folder.Parent = new_tab
+						button.Text = "      " .. folder_name
 
-				slider_data:Set(slider_options["min"])
-				return slider_data, slider
-			end
-
-			function tab_data:AddKeybind(keybind_name, callback, keybind_options)
-				local keybind_data = {}
-				keybind_name = tostring(keybind_name or "New Keybind")
-				callback = typeof(callback) == "function" and callback or function() end
-				keybind_options = typeof(keybind_options) == "table" and keybind_options or {}
-				keybind_options = {
-					["standard"] = keybind_options.standard or Enum.KeyCode.RightShift,
-				}
-
-				local keybind = prefabs:FindFirstChild("Keybind"):Clone()
-				local input = keybind:FindFirstChild("Input")
-				local title = keybind:FindFirstChild("Title")
-				keybind.ZIndex = keybind.ZIndex + (windows * 10)
-				input.ZIndex = input.ZIndex + (windows * 10)
-				input:GetChildren()[1].ZIndex = input:GetChildren()[1].ZIndex + (windows * 10)
-				title.ZIndex = title.ZIndex + (windows * 10)
-
-				keybind.Parent = new_tab
-				title.Text = "  " .. keybind_name
-				keybind.Size = UDim2.new(0, gNameLen(title) + 80, 0, 20)
-
-				registerThemeListener(function(t)
-					title.Font = t.font_title
-					title.TextColor3 = t.text_color
-					input.Font = t.font_body
-				end)
-
-				local shortkeys = {
-					RightControl = "RightCtrl",
-					LeftControl = "LeftCtrl",
-					LeftShift = "LShift",
-					RightShift = "RShift",
-					MouseButton1 = "Mouse1",
-					MouseButton2 = "Mouse2",
-				}
-
-				local activeKey = keybind_options.standard
-
-				function keybind_data:SetKeybind(Keybind)
-					local key = shortkeys[Keybind.Name] or Keybind.Name
-					input.Text = key
-					activeKey = Keybind
-				end
-
-				runtime:Connect(UIS.InputBegan, function(a, b)
-					if checks.binding then
 						runtime:Spawn(function()
-							wait()
-							checks.binding = false
-						end)
-						return
-					end
-					if a.KeyCode == activeKey and not b then
-						pcall(callback, activeKey)
-					end
-				end)
-
-				keybind_data:SetKeybind(keybind_options.standard)
-
-				runtime:Connect(input.MouseButton1Click, function()
-					if checks.binding then return end
-					input.Text = "..."
-					checks.binding = true
-					local a = UIS.InputBegan:Wait()
-					keybind_data:SetKeybind(a.KeyCode)
-				end)
-
-				return keybind_data, keybind
-			end
-
-			function tab_data:AddDropdown(dropdown_name, callback)
-				local dropdown_data = {}
-				local dropdown_objects = {}
-				dropdown_name = tostring(dropdown_name or "New Dropdown")
-				callback = typeof(callback) == "function" and callback or function() end
-
-				local dropdown = prefabs:FindFirstChild("Dropdown"):Clone()
-				local box = dropdown:FindFirstChild("Box")
-				local objects = box:FindFirstChild("Objects")
-				local indicator = dropdown:FindFirstChild("Indicator")
-				dropdown.ZIndex = dropdown.ZIndex + (windows * 10)
-				box.ZIndex = box.ZIndex + (windows * 10)
-				objects.ZIndex = objects.ZIndex + (windows * 10)
-				indicator.ZIndex = indicator.ZIndex + (windows * 10)
-				dropdown:GetChildren()[3].ZIndex = dropdown:GetChildren()[3].ZIndex + (windows * 10)
-
-				dropdown.Parent = new_tab
-				dropdown.Text = "      " .. dropdown_name
-				box.Size = UDim2.new(1, 0, 0, 0)
-
-				registerThemeListener(function(t)
-					dropdown.Font = t.font_body
-					dropdown.TextColor3 = t.text_color
-				end)
-
-				local open = false
-				runtime:Connect(dropdown.MouseButton1Click, function()
-					open = not open
-
-					local len = (#objects:GetChildren() - 1) * 20
-					if #objects:GetChildren() - 1 >= 10 then
-						len = 10 * 20
-						objects.CanvasSize = UDim2.new(0, 0, (#objects:GetChildren() - 1) * 0.1, 0)
-					end
-
-					if open then
-						if dropdown_open then return end
-						dropdown_open = true
-						Resize(box, {Size = UDim2.new(1, 0, 0, len)}, opts.tween_time)
-						Resize(indicator, {Rotation = 90}, opts.tween_time)
-					else
-						dropdown_open = false
-						Resize(box, {Size = UDim2.new(1, 0, 0, 0)}, opts.tween_time)
-						Resize(indicator, {Rotation = -90}, opts.tween_time)
-					end
-				end)
-
-				function dropdown_data:Add(n)
-					local object_data = {}
-					n = tostring(n or "New Object")
-					if not objects or not objects.Parent then
-						return object_data
-					end
-
-					local named_objects = dropdown_objects[n]
-					local existing_object
-					if named_objects then
-						for index = #named_objects, 1, -1 do
-							local current_object = named_objects[index]
-							if not current_object or not current_object.Parent then
-								table.remove(named_objects, index)
-							elseif existing_object then
-								current_object:Destroy()
-								table.remove(named_objects, index)
-							else
-								existing_object = current_object
+							while true do
+								if button and button:GetChildren()[1] then
+									button:GetChildren()[1].ImageColor3 = options.main_color
+								end
+								RS.Heartbeat:Wait()
 							end
-						end
+						end)
 
-						if #named_objects == 0 then
-							dropdown_objects[n] = nil
-						end
-					end
-
-					if existing_object then
-						function object_data:Remove()
-							dropdown_data:Remove(n)
-						end
-						return existing_object, object_data
-					end
-
-					local object_prefab = prefabs and prefabs:FindFirstChild("DropdownButton")
-					if not object_prefab then
-						return object_data
-					end
-
-					local object = object_prefab:Clone()
-					object.Parent = objects
-					object.Text = n
-					object.Font = opts.font_body
-					object.ZIndex = object.ZIndex + (windows * 10)
-					dropdown_objects[n] = dropdown_objects[n] or {}
-					table.insert(dropdown_objects[n], object)
-
-					runtime:Connect(object.MouseEnter, function()
-						object.BackgroundColor3 = opts.main_color
-					end)
-					runtime:Connect(object.MouseLeave, function()
-						object.BackgroundColor3 = Color3.fromRGB(33, 34, 36)
-					end)
-
-					if open then
-						local len = (#objects:GetChildren() - 1) * 20
-						if #objects:GetChildren() - 1 >= 10 then
-							len = 10 * 20
-							objects.CanvasSize = UDim2.new(0, 0, (#objects:GetChildren() - 1) * 0.1, 0)
-						end
-						Resize(box, {Size = UDim2.new(1, 0, 0, len)}, opts.tween_time)
-					end
-
-					runtime:Connect(object.MouseButton1Click, function()
-						if dropdown_open then
-							dropdown.Text = "      [ " .. n .. " ]"
-							dropdown_open = false
-							open = false
-							Resize(box, {Size = UDim2.new(1, 0, 0, 0)}, opts.tween_time)
-							Resize(indicator, {Rotation = -90}, opts.tween_time)
-							pcall(callback, n)
-						end
-					end)
-
-					function object_data:Remove()
-						if object.Parent then object:Destroy() end
-						local named_objects = dropdown_objects[n]
-						if named_objects then
-							for index = #named_objects, 1, -1 do
-								if named_objects[index] == object then
-									table.remove(named_objects, index)
+						local function gFolderLen()
+							local n = 25
+							for i,v in pairs(objects:GetChildren()) do
+								if not (v:IsA("UIListLayout")) then
+									n = n + v.AbsoluteSize.Y + 5
 								end
 							end
-							if #named_objects == 0 then dropdown_objects[n] = nil end
+							return n
 						end
-					end
 
-					return object, object_data
-				end
-
-				function dropdown_data:Remove(n)
-					n = tostring(n or "New Object")
-					local named_objects = dropdown_objects[n]
-					if not named_objects then return end
-
-					for _, object in ipairs(named_objects) do
-						if object.Parent then object:Destroy() end
-					end
-					dropdown_objects[n] = nil
-					if dropdown.Text == "      [ " .. n .. " ]" then
-						dropdown.Text = "      " .. dropdown_name
-					end
-					if open then
-						open = false
-						dropdown_open = false
-						Resize(box, {Size = UDim2.new(1, 0, 0, 0)}, opts.tween_time)
-						Resize(indicator, {Rotation = -90}, opts.tween_time)
-					end
-				end
-
-				function dropdown_data:Clear()
-					for name, named_objects in pairs(dropdown_objects) do
-						for _, object in ipairs(named_objects) do
-							if object.Parent then object:Destroy() end
-						end
-						dropdown_objects[name] = nil
-					end
-					dropdown.Text = "      " .. dropdown_name
-					if open then
-						open = false
-						dropdown_open = false
-						Resize(box, {Size = UDim2.new(1, 0, 0, 0)}, opts.tween_time)
-						Resize(indicator, {Rotation = -90}, opts.tween_time)
-					end
-				end
-
-				function dropdown_data:Refresh(items)
-					dropdown_data:Clear()
-					for _, item in ipairs(items or {}) do
-						dropdown_data:Add(item)
-					end
-				end
-
-				return dropdown_data, dropdown
-			end
-
-			function tab_data:AddThemeSelector(selector_text, callback)
-				selector_text = tostring(selector_text or "Tema de Interfaz")
-				callback = typeof(callback) == "function" and callback or function() end
-
-				local themeDropdown = tab_data:AddDropdown(selector_text .. " [" .. opts.theme_name .. "]", function(selectedTheme)
-					window_data:SetTheme(selectedTheme)
-					pcall(callback, selectedTheme)
-				end)
-
-				for _, tName in ipairs(THEME_ORDER) do
-					themeDropdown:Add(tName)
-				end
-
-				return themeDropdown
-			end
-
-			tab_data.AddThemeDropdown = tab_data.AddThemeSelector
-
-			function tab_data:AddConsole(console_options)
-				local console_data = {}
-				console_options = typeof(console_options) == "table" and console_options or {["readonly"] = true, ["full"] = false}
-				console_options = {
-					["y"] = tonumber(console_options.y) or 200,
-					["source"] = console_options.source or "Logs",
-					["readonly"] = ((console_options.readonly) == true),
-					["full"] = ((console_options.full) == true),
-				}
-
-				local console = prefabs:FindFirstChild("Console"):Clone()
-				console.Parent = new_tab
-				console.ZIndex = console.ZIndex + (windows * 10)
-				console.Size = UDim2.new(1, 0, console_options.full and 1 or 0, console_options.y)
-
-				local sf = console:GetChildren()[1]
-				local Source = sf:FindFirstChild("Source")
-				local Lines = sf:FindFirstChild("Lines")
-				Source.ZIndex = Source.ZIndex + (windows * 10)
-				Lines.ZIndex = Lines.ZIndex + (windows * 10)
-				Source.TextEditable = not console_options.readonly
-
-				for _, v in pairs(Source:GetChildren()) do
-					v.ZIndex = v.ZIndex + (windows * 10) + 1
-				end
-				Source.Comments.ZIndex = Source.Comments.ZIndex + 1
-
-				local lua_keywords = {"and", "break", "do", "else", "elseif", "end", "false", "for", "function", "goto", "if", "in", "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while"}
-				local global_env = {"getrawmetatable", "newcclosure", "islclosure", "setclipboard", "game", "workspace", "script", "math", "string", "table", "print", "wait", "BrickColor", "Color3", "next", "pairs", "ipairs", "select", "unpack", "Instance", "Vector2", "Vector3", "CFrame", "Ray", "UDim2", "Enum", "assert", "error", "warn", "tick", "loadstring", "_G", "shared", "getfenv", "setfenv", "newproxy", "setmetatable", "getmetatable", "os", "debug", "pcall", "ypcall", "xpcall", "rawequal", "rawset", "rawget", "tonumber", "tostring", "type", "typeof", "_VERSION", "coroutine", "delay", "require", "spawn", "LoadLibrary", "settings", "stats", "time", "UserSettings", "version", "Axes", "ColorSequence", "Faces", "ColorSequenceKeypoint", "NumberRange", "NumberSequence", "NumberSequenceKeypoint", "gcinfo", "elapsedTime", "collectgarbage", "PhysicalProperties", "Rect", "Region3", "Region3int16", "UDim", "Vector2int16", "Vector3int16", "load", "fire", "Fire"}
-
-				local function Highlight(str, keywords)
-					local K = {}
-					local S = str
-					local Token = {
-						["="] = true, ["."] = true, [","] = true, ["("] = true, [")"] = true,
-						["["] = true, ["]"] = true, ["{"] = true, ["}"] = true, [":"] = true,
-						["*"] = true, ["/"] = true, ["+"] = true, ["-"] = true, ["%"] = true,
-						[";"] = true, ["~"] = true,
-					}
-					for _, v in pairs(keywords) do
-						K[v] = true
-					end
-					S = S:gsub(".", function(c)
-						if Token[c] ~= nil then
-							return "\32"
-						else
-							return c
-						end
-					end)
-					S = S:gsub("%S+", function(c)
-						if K[c] ~= nil then
-							return c
-						else
-							return (" "):rep(#c)
-						end
-					end)
-					return S
-				end
-
-				local function hTokens(str)
-					local Token = {
-						["="] = true, ["."] = true, [","] = true, ["("] = true, [")"] = true,
-						["["] = true, ["]"] = true, ["{"] = true, ["}"] = true, [":"] = true,
-						["*"] = true, ["/"] = true, ["+"] = true, ["-"] = true, ["%"] = true,
-						[";"] = true, ["~"] = true,
-					}
-					local A = ""
-					str:gsub(".", function(c)
-						if Token[c] ~= nil then
-							A = A .. c
-						elseif c == "\n" then
-							A = A .. "\n"
-						elseif c == "\t" then
-							A = A .. "\t"
-						else
-							A = A .. "\32"
-						end
-					end)
-					return A
-				end
-
-				local function strings(str)
-					local highlight = ""
-					local quote = false
-					str:gsub(".", function(c)
-						if quote == false and c == "\34" then
-							quote = true
-						elseif quote == true and c == "\34" then
-							quote = false
-						end
-						if quote == false and c == "\34" then
-							highlight = highlight .. "\34"
-						elseif c == "\n" then
-							highlight = highlight .. "\n"
-						elseif c == "\t" then
-							highlight = highlight .. "\t"
-						elseif quote == true then
-							highlight = highlight .. c
-						elseif quote == false then
-							highlight = highlight .. "\32"
-						end
-					end)
-					return highlight
-				end
-
-				local function info(str)
-					local highlight = ""
-					local quote = false
-					str:gsub(".", function(c)
-						if quote == false and c == "[" then
-							quote = true
-						elseif quote == true and c == "]" then
-							quote = false
-						end
-						if quote == false and c == "]" then
-							highlight = highlight .. "]"
-						elseif c == "\n" then
-							highlight = highlight .. "\n"
-						elseif c == "\t" then
-							highlight = highlight .. "\t"
-						elseif quote == true then
-							highlight = highlight .. c
-						elseif quote == false then
-							highlight = highlight .. "\32"
-						end
-					end)
-					return highlight
-				end
-
-				local function comments(str)
-					local ret = ""
-					str:gsub("[^\r\n]+", function(c)
-						local comm = false
-						local i = 0
-						c:gsub(".", function(n)
-							i = i + 1
-							if c:sub(i, i + 1) == "--" then
-								comm = true
-							end
-							if comm == true then
-								ret = ret .. n
+						local open = false
+						runtime:Connect(button.MouseButton1Click, function()
+							if open then
+								objects.Visible = false
 							else
-								ret = ret .. "\32"
+								objects.Visible = true
+							end
+
+							open = not open
+						end)
+
+						runtime:Spawn(function()
+							while true do
+								Resize(folder, {Size = UDim2.new(1, 0, 0, (open and gFolderLen() or 20))}, options.tween_time)
+								wait()
 							end
 						end)
-					end)
-					return ret
-				end
 
-				local function numbers(str)
-					local A = ""
-					str:gsub(".", function(c)
-						if tonumber(c) ~= nil then
-							A = A .. c
-						elseif c == "\n" then
-							A = A .. "\n"
-						elseif c == "\t" then
-							A = A .. "\t"
-						else
-							A = A .. "\32"
+						for i,v in pairs(tab_data) do
+							folder_data[i] = function(...)
+								local data, object
+								local ret = {v(...)}
+								if typeof(ret[1]) == "table" then
+									data = ret[1]
+									object = ret[2]
+									object.Parent = objects
+									return data, object
+								else
+									object = ret[1]
+									object.Parent = objects
+									return object
+								end
+							end
 						end
-					end)
-					return A
-				end
 
-				local function highlight_logs_text(s)
-					local result = s
-					for _, name in ipairs({"print", "warn", "error", "console.log"}) do
-						local pat = name:gsub("%.", "%%.")
-						result = result:gsub(pat .. "%s*%b()", '<font color="rgb(130,255,170)">%0</font>')
+						return folder_data, folder
 					end
-					return result
+
 				end
 
-				local function highlight_lua(kind)
-					if kind == "Text" then
-						Source.Text = Source.Text:gsub("\13", "")
-						Source.Text = Source.Text:gsub("\t", "      ")
-						local s = Source.Text
-
-						Source.Keywords.Text = Highlight(s, lua_keywords)
-						Source.Globals.Text = Highlight(s, global_env)
-						Source.RemoteHighlight.Text = Highlight(s, {"FireServer", "fireServer", "InvokeServer", "invokeServer"})
-						Source.Tokens.Text = hTokens(s)
-						Source.Numbers.Text = numbers(s)
-						Source.Strings.Text = strings(s)
-						Source.Comments.Text = comments(s)
-						Source.Info.Text = info(s)
-
-						local lin = 1
-						s:gsub("\n", function()
-							lin = lin + 1
-						end)
-
-						Lines.Text = ""
-						for i = 1, lin do
-							Lines.Text = Lines.Text .. i .. "\n"
-						end
-
-						sf.CanvasSize = UDim2.new(0, 0, lin * 0.153846154, 0)
-					end
-				end
-
-				local function highlight_logs(kind)
-					if kind == "Text" then
-						Source.Text = Source.Text:gsub("\13", "")
-						Source.Text = Source.Text:gsub("\t", "      ")
-						local s = Source.Text
-						Source.Keywords.Text = Highlight(s, lua_keywords)
-						Source.Globals.Text = Highlight(s, global_env)
-						Source.RemoteHighlight.Text = Highlight(s, {"FireServer", "fireServer", "InvokeServer", "invokeServer"})
-						Source.Tokens.Text = hTokens(s)
-						Source.Numbers.Text = numbers(s)
-						Source.Strings.Text = strings(s)
-						Source.Comments.Text = comments(s)
-						if Source:FindFirstChild("Logs") then
-							Source.Logs.Text = highlight_logs_text(s)
-						end
-						local lin = 1
-						s:gsub("\n", function() lin = lin + 1 end)
-						Lines.Text = ""
-						for i = 1, lin do
-							Lines.Text = Lines.Text .. i .. "\n"
-						end
-						sf.CanvasSize = UDim2.new(0, 0, lin * 0.153846154, 0)
-					end
-				end
-
-				if console_options.source == "Lua" then
-					highlight_lua("Text")
-					runtime:Connect(Source.Changed, highlight_lua)
-				elseif console_options.source == "Logs" then
-					Lines.Visible = false
-					highlight_logs("Text")
-					runtime:Connect(Source.Changed, highlight_logs)
-				end
-
-				function console_data:Set(code)
-					Source.Text = tostring(code)
-				end
-
-				function console_data:Get()
-					return Source.Text
-				end
-
-				function console_data:Log(msg)
-					Source.Text = Source.Text .. "[*] " .. tostring(msg) .. "\n"
-				end
-
-				return console_data, console
+				return tab_data, new_tab
 			end
-
-			function tab_data:AddHorizontalAlignment()
-				local ha_data = {}
-				local ha = prefabs:FindFirstChild("HorizontalAlignment"):Clone()
-				ha.Parent = new_tab
-
-				function ha_data:AddButton(...)
-					local data, object
-					local ret = {tab_data:AddButton(...)}
-					if typeof(ret[1]) == "table" then
-						data = ret[1]
-						object = ret[2]
-						object.Parent = ha
-						return data, object
-					else
-						object = ret[1]
-						object.Parent = ha
-						return object
-					end
-				end
-
-				return ha_data, ha
-			end
-
-			function tab_data:AddFolder(folder_name)
-				local folder_data = {}
-				folder_name = tostring(folder_name or "New Folder")
-
-				local folder = prefabs:FindFirstChild("Folder"):Clone()
-				local button = folder:FindFirstChild("Button")
-				local objects = folder:FindFirstChild("Objects")
-				local toggleBtn = button:FindFirstChild("Toggle")
-				folder.ZIndex = folder.ZIndex + (windows * 10)
-				button.ZIndex = button.ZIndex + (windows * 10)
-				objects.ZIndex = objects.ZIndex + (windows * 10)
-				toggleBtn.ZIndex = toggleBtn.ZIndex + (windows * 10)
-				button:GetChildren()[1].ZIndex = button:GetChildren()[1].ZIndex + (windows * 10)
-
-				folder.Parent = new_tab
-				button.Text = "      " .. folder_name
-
-				registerThemeListener(function(t)
-					button.Font = t.font_body
-					button.TextColor3 = t.text_color
-					if button and button:GetChildren()[1] then
-						button:GetChildren()[1].ImageColor3 = t.main_color
-					end
-				end)
-
-				local function gFolderLen()
-					local n = 25
-					for _, v in pairs(objects:GetChildren()) do
-						if not (v:IsA("UIListLayout")) then
-							n = n + v.AbsoluteSize.Y + 5
-						end
-					end
-					return n
-				end
-
-				local open = false
-				runtime:Connect(button.MouseButton1Click, function()
-					open = not open
-					objects.Visible = open
-					Resize(folder, {Size = UDim2.new(1, 0, 0, (open and gFolderLen() or 20))}, opts.tween_time)
-				end)
-
-				for i, v in pairs(tab_data) do
-					folder_data[i] = function(...)
-						local data, object
-						local ret = {v(...)}
-						if typeof(ret[1]) == "table" then
-							data = ret[1]
-							object = ret[2]
-							object.Parent = objects
-							return data, object
-						else
-							object = ret[1]
-							object.Parent = objects
-							return object
-						end
-					end
-				end
-
-				return folder_data, folder
-			end
-
-			return tab_data, new_tab
 		end
 	end
 
-	for _, v in pairs(Window:GetDescendants()) do
-		if hasprop(v, "ZIndex") then
-			v.ZIndex = v.ZIndex + (windows * 10)
+	do
+		for i, v in pairs(Window:GetDescendants()) do
+			if hasprop(v, "ZIndex") then
+				v.ZIndex = v.ZIndex + (windows * 10)
+			end
 		end
 	end
 
