@@ -103,6 +103,38 @@ local CoreGui
 if not isSolara then pcall(function() CoreGui = game:GetService("CoreGui") end) end
 if CoreGui then pcall(function() CoreGui = cloneref(CoreGui) end) end
 
+local function getViewportSize()
+	local cam = workspace.CurrentCamera
+	if cam and cam.ViewportSize.X > 0 and cam.ViewportSize.Y > 0 then
+		return cam.ViewportSize
+	end
+	return Vector2.new(800, 600)
+end
+
+local function isCompactDevice()
+	local vp = getViewportSize()
+	return (UIS.TouchEnabled and not UIS.KeyboardEnabled) or vp.X < 650 or vp.Y < 450
+end
+
+local function getResponsiveDimensions(requestedSize)
+	local vp = getViewportSize()
+	local compact = isCompactDevice()
+
+	local maxAllowedW = math.max(240, vp.X - (compact and 28 or 40))
+	local maxAllowedH = math.max(190, vp.Y - (compact and 84 or 90))
+
+	local targetW = compact and math.min(requestedSize.X, math.floor(vp.X * 0.86)) or requestedSize.X
+	local targetH = compact and math.min(requestedSize.Y, math.floor(vp.Y * 0.72)) or requestedSize.Y
+
+	local finalW = math.clamp(targetW, 240, maxAllowedW)
+	local finalH = math.clamp(targetH, 190, maxAllowedH)
+
+	local hardMinW = math.min(compact and 250 or 320, maxAllowedW)
+	local hardMinH = math.min(compact and 195 or 240, maxAllowedH)
+
+	return Vector2.new(finalW, finalH), Vector2.new(hardMinW, hardMinH), vp
+end
+
 local function mountGui(gui)
 	if not isSolara and type(gethui) == "function" then
 		pcall(function() gui.Parent = gethui() end)
@@ -149,15 +181,16 @@ toggleGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 mountGui(toggleGui)
 runtime:AddCleanup(function() toggleGui:Destroy() end)
 
+local btnSize = isCompactDevice() and 40 or 44
 local floatingBtn = Instance.new("TextButton")
 floatingBtn.Name = "OpenCloseBtn"
 floatingBtn.Parent = toggleGui
 floatingBtn.BackgroundColor3 = ui_options.main_color
-floatingBtn.Position = UDim2.new(0.5, -22, 0, 12)
-floatingBtn.Size = UDim2.new(0, 44, 0, 44)
+floatingBtn.Position = UDim2.new(0.5, -math.floor(btnSize / 2), 0, 10)
+floatingBtn.Size = UDim2.new(0, btnSize, 0, btnSize)
 floatingBtn.Font = Enum.Font.GothamBold
 floatingBtn.Text = "⚙️"
-floatingBtn.TextSize = 20
+floatingBtn.TextSize = isCompactDevice() and 18 or 20
 floatingBtn.TextColor3 = Color3.new(1, 1, 1)
 floatingBtn.AutoButtonColor = false
 floatingBtn.ZIndex = 100
@@ -287,11 +320,17 @@ function library:Destroy()
 end
 
 function library:FormatWindows()
-	local xOffset = 25
+	local vp = getViewportSize()
+	local xOffset = 15
+	local yOffset = 60
 	for _, win in ipairs(windowsFrame:GetChildren()) do
 		if win:IsA("Frame") then
-			win.Position = UDim2.new(0, xOffset, 0, 65)
-			xOffset = xOffset + win.AbsoluteSize.X + 15
+			if xOffset + win.AbsoluteSize.X > vp.X and xOffset > 15 then
+				xOffset = 15
+				yOffset = yOffset + 40
+			end
+			win.Position = UDim2.new(0, xOffset, 0, yOffset)
+			xOffset = xOffset + win.AbsoluteSize.X + 12
 		end
 	end
 end
@@ -300,14 +339,21 @@ function library:AddWindow(title, options)
 	if not runtime.Alive then return end
 	windows = windows + 1
 
+	local requestedSize = (typeof(options) == "table" and options.min_size) or ui_options.min_size
+	local initialSize, hardMinSize, vp = getResponsiveDimensions(requestedSize)
+
 	local opts = {
 		main_color = (typeof(options) == "table" and options.main_color) or ui_options.main_color,
-		min_size = (typeof(options) == "table" and options.min_size) or ui_options.min_size,
+		min_size = hardMinSize,
 		can_resize = (typeof(options) == "table" and options.can_resize ~= nil) and options.can_resize or ui_options.can_resize,
 		tween_time = 0.16,
 	}
 
 	floatingBtn.BackgroundColor3 = opts.main_color
+
+	-- Posición inicial adaptada al centro de la pantalla
+	local startX = math.max(12, math.floor((vp.X - initialSize.X) / 2) + ((windows - 1) * 18))
+	local startY = math.clamp(60 + ((windows - 1) * 18), 54, math.max(54, vp.Y - initialSize.Y - 12))
 
 	-- Ventana Principal
 	local Window = Instance.new("Frame")
@@ -316,10 +362,10 @@ function library:AddWindow(title, options)
 	Window.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 	Window.BorderSizePixel = 0
 	Window.ClipsDescendants = true
-	Window.Position = UDim2.new(0, 25 + ((windows - 1) * 30), 0, 65)
-	Window.Size = UDim2.new(0, opts.min_size.X, 0, opts.min_size.Y)
+	Window.Position = UDim2.new(0, startX, 0, startY)
+	Window.Size = UDim2.new(0, initialSize.X, 0, initialSize.Y)
 	addCorner(Window, 8)
-	local windowStroke = addStroke(Window, opts.main_color, 1.3, 0.2)
+	addStroke(Window, opts.main_color, 1.3, 0.2)
 
 	-- Barra Superior
 	local Bar = Instance.new("Frame")
@@ -373,6 +419,7 @@ function library:AddWindow(title, options)
 	TitleLabel.Text = tostring(title or "New Window")
 	TitleLabel.TextColor3 = Color3.new(1, 1, 1)
 	TitleLabel.TextSize = 14
+	TitleLabel.TextTruncate = Enum.TextTruncate.AtEnd
 	TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 	TitleLabel.ZIndex = 3
 
@@ -417,13 +464,55 @@ function library:AddWindow(title, options)
 	Resizer.Name = "Resizer"
 	Resizer.Parent = Window
 	Resizer.BackgroundTransparency = 1
-	Resizer.Position = UDim2.new(1, -18, 1, -18)
-	Resizer.Size = UDim2.new(0, 18, 0, 18)
+	Resizer.Position = UDim2.new(1, -22, 1, -22)
+	Resizer.Size = UDim2.new(0, 22, 0, 22)
 	Resizer.Text = "◢"
 	Resizer.TextColor3 = Color3.fromRGB(130, 130, 145)
-	Resizer.TextSize = 11
+	Resizer.TextSize = 12
 	Resizer.Visible = opts.can_resize
 	Resizer.ZIndex = 5
+
+	local isOpen = true
+	local savedHeight = initialSize.Y
+
+	-- Reajuste automático si cambia la resolución o se gira la pantalla
+	local function clampToViewport()
+		if not Window or not Window.Parent then return end
+		local _, newHardMin, currentVp = getResponsiveDimensions(requestedSize)
+		opts.min_size = newHardMin
+
+		local maxW = math.max(240, currentVp.X - 20)
+		local maxH = math.max(190, currentVp.Y - 70)
+
+		local curW = math.min(Window.Size.X.Offset, maxW)
+		if isOpen then
+			local curH = math.min(Window.Size.Y.Offset, maxH)
+			savedHeight = curH
+			Window.Size = UDim2.new(0, curW, 0, curH)
+		else
+			savedHeight = math.min(savedHeight, maxH)
+			Window.Size = UDim2.new(0, curW, 0, 30)
+		end
+
+		local clampedX = math.clamp(Window.Position.X.Offset, 6, math.max(6, currentVp.X - curW - 6))
+		local clampedY = math.clamp(Window.Position.Y.Offset, 6, math.max(6, currentVp.Y - Window.Size.Y.Offset - 6))
+		Window.Position = UDim2.new(0, clampedX, 0, clampedY)
+	end
+
+	do
+		local camConn
+		local function bindCamera(cam)
+			if camConn then camConn:Disconnect() end
+			if cam then
+				camConn = runtime:Connect(cam:GetPropertyChangedSignal("ViewportSize"), clampToViewport)
+			end
+		end
+		bindCamera(workspace.CurrentCamera)
+		runtime:Connect(workspace:GetPropertyChangedSignal("CurrentCamera"), function()
+			bindCamera(workspace.CurrentCamera)
+			clampToViewport()
+		end)
+	end
 
 	if opts.can_resize then
 		local resizing, resizeStart, startSize = false, nil, nil
@@ -436,9 +525,10 @@ function library:AddWindow(title, options)
 		end)
 		runtime:Connect(UIS.InputChanged, function(input)
 			if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+				local currentVp = getViewportSize()
 				local delta = input.Position - resizeStart
-				local newX = math.max(opts.min_size.X, startSize.X + delta.X)
-				local newY = math.max(opts.min_size.Y, startSize.Y + delta.Y)
+				local newX = math.clamp(startSize.X + delta.X, opts.min_size.X, currentVp.X - 16)
+				local newY = math.clamp(startSize.Y + delta.Y, opts.min_size.Y, currentVp.Y - 60)
 				Window.Size = UDim2.new(0, newX, 0, newY)
 			end
 		end)
@@ -450,9 +540,7 @@ function library:AddWindow(title, options)
 	end
 
 	-- Lógica de Minimizar
-	local isOpen = true
 	local canToggle = true
-	local savedHeight = opts.min_size.Y
 
 	runtime:Connect(ToggleBtn.MouseButton1Click, function()
 		if not canToggle then return end
@@ -510,7 +598,7 @@ function library:AddWindow(title, options)
 		tabBtn.TextColor3 = Color3.fromRGB(185, 185, 195)
 		tabBtn.TextSize = 13
 		tabBtn.AutoButtonColor = false
-		tabBtn.Size = UDim2.new(0, math.max(68, tabBtn.TextBounds.X + 20), 1, 0)
+		tabBtn.Size = UDim2.new(0, math.max(64, tabBtn.TextBounds.X + 18), 1, 0)
 		addCorner(tabBtn, 5)
 
 		local tabPage = Instance.new("ScrollingFrame")
@@ -640,6 +728,7 @@ function library:AddWindow(title, options)
 			titleLbl.Text = tostring(switch_text or "Switch")
 			titleLbl.TextColor3 = Color3.fromRGB(220, 220, 230)
 			titleLbl.TextSize = 13
+			titleLbl.TextTruncate = Enum.TextTruncate.AtEnd
 			titleLbl.TextXAlignment = Enum.TextXAlignment.Left
 
 			local pill = Instance.new("Frame")
@@ -723,6 +812,7 @@ function library:AddWindow(title, options)
 			titleLbl.Text = tostring(slider_text or "Slider")
 			titleLbl.TextColor3 = Color3.fromRGB(220, 220, 230)
 			titleLbl.TextSize = 13
+			titleLbl.TextTruncate = Enum.TextTruncate.AtEnd
 			titleLbl.TextXAlignment = Enum.TextXAlignment.Left
 
 			local valLbl = Instance.new("TextLabel")
@@ -878,6 +968,7 @@ function library:AddWindow(title, options)
 			headerBtn.Text = "   " .. dropdown_name
 			headerBtn.TextColor3 = Color3.fromRGB(220, 220, 230)
 			headerBtn.TextSize = 13
+			headerBtn.TextTruncate = Enum.TextTruncate.AtEnd
 			headerBtn.TextXAlignment = Enum.TextXAlignment.Left
 
 			local arrow = Instance.new("TextLabel")
