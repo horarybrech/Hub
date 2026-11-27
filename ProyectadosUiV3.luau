@@ -66,9 +66,10 @@ do
 end
 
 local WHITE = Color3.new(1, 1, 1)
+local BLACK = Color3.new(0, 0, 0)
 local DEFAULT_TWEEN = TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
--- Temas con colores sólidos simples (sin Default Elirium, sin neón ni degradados)
+-- Temas (sin Default Elirium, con emojis de Elirium en el tema morado)
 local THEME_ORDER = {
 	"Morado Neón",
 	"Carmesí Imperial",
@@ -81,7 +82,7 @@ local THEME_ORDER = {
 
 local THEMES = {
 	["Morado Neón"] = {
-		main_color = Color3.fromRGB(120, 72, 185),
+		main_color = Color3.fromRGB(128, 76, 196),
 		bg_color = Color3.fromRGB(22, 22, 26),
 		surface_color = Color3.fromRGB(32, 32, 38),
 		bar_color = Color3.fromRGB(38, 38, 46),
@@ -95,10 +96,10 @@ local THEMES = {
 		open_icon = "📽️",
 		closed_icon = "❤️‍🔥",
 		gui_icon = "⚙️",
-		gui_hidden_icon = "👁️",
+		gui_hidden_icon = "⚙️",
 	},
 	["Carmesí Imperial"] = {
-		main_color = Color3.fromRGB(175, 58, 72),
+		main_color = Color3.fromRGB(184, 58, 76),
 		bg_color = Color3.fromRGB(24, 20, 21),
 		surface_color = Color3.fromRGB(34, 28, 30),
 		bar_color = Color3.fromRGB(42, 34, 36),
@@ -111,11 +112,11 @@ local THEMES = {
 		corner_card = 7,
 		open_icon = "👑",
 		closed_icon = "🌹",
-		gui_icon = "⚙️",
-		gui_hidden_icon = "🥀",
+		gui_icon = "🗡️",
+		gui_hidden_icon = "🗡️",
 	},
 	["Ciber Cian"] = {
-		main_color = Color3.fromRGB(48, 145, 185),
+		main_color = Color3.fromRGB(46, 152, 194),
 		bg_color = Color3.fromRGB(19, 23, 28),
 		surface_color = Color3.fromRGB(28, 34, 41),
 		bar_color = Color3.fromRGB(34, 42, 50),
@@ -128,11 +129,11 @@ local THEMES = {
 		corner_card = 5,
 		open_icon = "⚡",
 		closed_icon = "💠",
-		gui_icon = "⚙️",
-		gui_hidden_icon = "🔌",
+		gui_icon = "🛰️",
+		gui_hidden_icon = "🛰️",
 	},
 	["Esmeralda Tóxica"] = {
-		main_color = Color3.fromRGB(56, 148, 92),
+		main_color = Color3.fromRGB(58, 156, 96),
 		bg_color = Color3.fromRGB(20, 24, 21),
 		surface_color = Color3.fromRGB(29, 35, 31),
 		bar_color = Color3.fromRGB(35, 43, 38),
@@ -145,11 +146,11 @@ local THEMES = {
 		corner_card = 9,
 		open_icon = "🧪",
 		closed_icon = "💚",
-		gui_icon = "⚙️",
-		gui_hidden_icon = "🍀",
+		gui_icon = "🌿",
+		gui_hidden_icon = "🌿",
 	},
 	["Oro Real"] = {
-		main_color = Color3.fromRGB(184, 138, 48),
+		main_color = Color3.fromRGB(194, 145, 48),
 		bg_color = Color3.fromRGB(24, 22, 18),
 		surface_color = Color3.fromRGB(34, 31, 25),
 		bar_color = Color3.fromRGB(42, 38, 30),
@@ -162,11 +163,11 @@ local THEMES = {
 		corner_card = 8,
 		open_icon = "🏆",
 		closed_icon = "✨",
-		gui_icon = "⚙️",
-		gui_hidden_icon = "⭐",
+		gui_icon = "👑",
+		gui_hidden_icon = "👑",
 	},
 	["Rosa Sakura"] = {
-		main_color = Color3.fromRGB(186, 82, 136),
+		main_color = Color3.fromRGB(196, 84, 142),
 		bg_color = Color3.fromRGB(24, 20, 22),
 		surface_color = Color3.fromRGB(34, 28, 31),
 		bar_color = Color3.fromRGB(42, 34, 38),
@@ -179,11 +180,11 @@ local THEMES = {
 		corner_card = 9,
 		open_icon = "🌸",
 		closed_icon = "🎀",
-		gui_icon = "⚙️",
-		gui_hidden_icon = "🫧",
+		gui_icon = "🌸",
+		gui_hidden_icon = "🌸",
 	},
 	["Mecha Titanio"] = {
-		main_color = Color3.fromRGB(128, 142, 162),
+		main_color = Color3.fromRGB(138, 152, 172),
 		bg_color = Color3.fromRGB(22, 24, 28),
 		surface_color = Color3.fromRGB(32, 35, 40),
 		bar_color = Color3.fromRGB(39, 43, 49),
@@ -196,7 +197,7 @@ local THEMES = {
 		corner_card = 6,
 		open_icon = "🛡️",
 		closed_icon = "⚙️",
-		gui_icon = "⚙️",
+		gui_icon = "🔩",
 		gui_hidden_icon = "🔩",
 	},
 }
@@ -205,10 +206,19 @@ local DEFAULT_THEME_NAME = "Morado Neón"
 
 local ui_options = {
 	theme = DEFAULT_THEME_NAME,
+	neon = false, -- apagado = sólido, encendido = neón
 	min_size = Vector2.new(440, 310),
 	toggle_key = Enum.KeyCode.RightShift,
 	can_resize = true,
 }
+
+local function shiftColor(c, delta)
+	if delta >= 0 then
+		return c:Lerp(WHITE, math.clamp(delta, 0, 1))
+	else
+		return c:Lerp(BLACK, math.clamp(-delta, 0, 1))
+	end
+end
 
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
@@ -298,6 +308,21 @@ local function getSavedWindowTheme(winKey)
 	local entry = _G.UniversalUISavedConfig[winKey]
 	if type(entry) == "table" and type(entry.theme) == "string" and THEMES[entry.theme] then
 		return entry.theme
+	end
+	return nil
+end
+
+local function saveWindowNeon(winKey, isNeon)
+	local entry = _G.UniversalUISavedConfig[winKey] or {}
+	entry.neon = (isNeon == true)
+	_G.UniversalUISavedConfig[winKey] = entry
+	flushConfigFile()
+end
+
+local function getSavedWindowNeon(winKey)
+	local entry = _G.UniversalUISavedConfig[winKey]
+	if type(entry) == "table" and type(entry.neon) == "boolean" then
+		return entry.neon
 	end
 	return nil
 end
@@ -451,7 +476,7 @@ runtime:Connect(UIS.InputBegan, function(input, gameProcessed)
 	end
 end)
 
--- Botón flotante para ocultar/mostrar la GUI (colores sólidos simples)
+-- Botón flotante para ocultar/mostrar la GUI
 local toggleGui = Instance.new("ScreenGui")
 toggleGui.Name = "ToggleUI"
 toggleGui.ResetOnSpawn = false
@@ -535,6 +560,22 @@ local function addStroke(parent, color, thickness, transparency)
 	return s
 end
 
+local function ensureGradient(parent, colorA, colorB, angle)
+	local grad = parent:FindFirstChildOfClass("UIGradient")
+	if not grad then
+		grad = Instance.new("UIGradient")
+		grad.Parent = parent
+	end
+	grad.Color = ColorSequence.new(colorA, colorB)
+	grad.Rotation = angle or 0
+	return grad
+end
+
+local function removeGradient(parent)
+	local grad = parent:FindFirstChildOfClass("UIGradient")
+	if grad then grad:Destroy() end
+end
+
 local function bindWindowDrag(targetFrame, handles)
 	for _, handle in ipairs(handles) do
 		runtime:Connect(handle.InputBegan, function(input)
@@ -592,29 +633,42 @@ function library:AddWindow(title, options)
 	local requestedTheme = (typeof(options) == "table" and type(options.theme) == "string" and THEMES[options.theme]) and options.theme or ui_options.theme
 	local initialThemeName = getSavedWindowTheme(winKey) or requestedTheme
 
+	local savedNeon = getSavedWindowNeon(winKey)
+	local initialNeon = (savedNeon ~= nil) and savedNeon or ((typeof(options) == "table" and type(options.neon) == "boolean") and options.neon or ui_options.neon)
+
 	local opts = {
 		theme_name = initialThemeName,
+		neon = initialNeon,
 		min_size = hardMinSize,
 		can_resize = (typeof(options) == "table" and options.can_resize ~= nil) and options.can_resize or ui_options.can_resize,
 		tween_time = 0.15,
 	}
 
-	-- Paleta sólida simple
+	-- Paleta dinámica: Sólido (apagado) o Neón (encendido)
 	local palette = {}
 	local function rebuildPalette()
 		local t = THEMES[opts.theme_name] or THEMES[DEFAULT_THEME_NAME]
+		local neonOn = opts.neon == true
+		local neonAccent = shiftColor(t.main_color, 0.32)
+		local neonDeep = shiftColor(t.main_color, -0.25)
+
 		palette.name = opts.theme_name
-		palette.main = t.main_color
-		palette.bg = t.bg_color
-		palette.surface = t.surface_color
-		palette.bar = t.bar_color
-		palette.border = t.border_color
-		palette.text = t.text_color
-		palette.muted = t.muted_text
+		palette.isNeon = neonOn
+		palette.main = neonOn and shiftColor(t.main_color, 0.10) or t.main_color
+		palette.neonBright = neonAccent
+		palette.neonDeep = neonDeep
+		palette.bg = neonOn and shiftColor(t.bg_color, -0.15) or t.bg_color
+		palette.surface = neonOn and shiftColor(t.surface_color, -0.05) or t.surface_color
+		palette.bar = neonOn and shiftColor(t.bar_color, -0.05) or t.bar_color
+		palette.border = neonOn and t.main_color or t.border_color
+		palette.neonBorder = neonAccent
+		palette.text = neonOn and shiftColor(t.text_color, 0.06) or t.text_color
+		palette.muted = neonOn and shiftColor(t.muted_text, 0.14) or t.muted_text
 		palette.fontTitle = t.font_title
 		palette.fontBody = t.font_body
 		palette.cornerWindow = t.corner_window
 		palette.cornerCard = t.corner_card
+		palette.strokeThickness = neonOn and 1.8 or 1.2
 		palette.openIcon = t.open_icon or "📽️"
 		palette.closedIcon = t.closed_icon or "❤️‍🔥"
 		palette.guiIcon = t.gui_icon or "⚙️"
@@ -627,6 +681,7 @@ function library:AddWindow(title, options)
 	local bodyFontObjs = {}
 	local cardCornerObjs = {}
 	local syncLayoutAfterTheme = nil
+	local neonSwitchController = nil
 
 	local function registerTitleFont(obj)
 		obj.Font = palette.fontTitle
@@ -649,11 +704,17 @@ function library:AddWindow(title, options)
 	end
 
 	local function applyFloatingTheme()
-		floatingStroke.Color = palette.border
+		floatingStroke.Color = palette.isNeon and palette.neonBright or palette.border
+		floatingStroke.Thickness = palette.strokeThickness
 		floatingBtn.BackgroundColor3 = palette.surface
 		floatingBtn.TextColor3 = palette.text
 		floatingBtn.Font = palette.fontTitle
 		floatingBtn.Text = imgui.Enabled and palette.guiIcon or palette.guiHiddenIcon
+		if palette.isNeon then
+			ensureGradient(floatingBtn, palette.main, palette.neonBright, 45)
+		else
+			removeGradient(floatingBtn)
+		end
 	end
 
 	syncFloatingGuiBtn = applyFloatingTheme
@@ -675,6 +736,9 @@ function library:AddWindow(title, options)
 		for i = 1, #themeCallbacks do
 			pcall(themeCallbacks[i], palette)
 		end
+		if neonSwitchController then
+			pcall(neonSwitchController.SyncVisual, opts.neon)
+		end
 		if syncLayoutAfterTheme then
 			pcall(syncLayoutAfterTheme)
 		end
@@ -688,7 +752,7 @@ function library:AddWindow(title, options)
 	local BORDER_THICKNESS = 1
 	local MINIMIZED_HEIGHT = 34 + (BORDER_THICKNESS * 2)
 
-	-- Ventana principal con color sólido
+	-- Ventana principal
 	local Window = Instance.new("Frame")
 	Window.Name = "Window_" .. windows
 	Window.Parent = windowsFrame
@@ -699,7 +763,7 @@ function library:AddWindow(title, options)
 	Window.Position = UDim2.new(0, startX, 0, startY)
 	Window.Size = UDim2.new(0, initialSize.X, 0, initialSize.Y)
 	local windowCorner = addCorner(Window, palette.cornerWindow)
-	local windowStroke = addStroke(Window, palette.border, 1.2, 0)
+	local windowStroke = addStroke(Window, palette.border, palette.strokeThickness, 0)
 
 	-- Contenedor interior
 	local InnerFrame = Instance.new("Frame")
@@ -712,7 +776,7 @@ function library:AddWindow(title, options)
 	InnerFrame.Size = UDim2.new(1, -(BORDER_THICKNESS * 2), 1, -(BORDER_THICKNESS * 2))
 	local innerCorner = addCorner(InnerFrame, math.max(4, palette.cornerWindow - 1))
 
-	-- Barra superior sólida
+	-- Barra superior
 	local Bar = Instance.new("Frame")
 	Bar.Name = "Bar"
 	Bar.Parent = InnerFrame
@@ -735,7 +799,8 @@ function library:AddWindow(title, options)
 	onThemeChange(function(p)
 		Window.BackgroundColor3 = p.bg
 		windowCorner.CornerRadius = UDim.new(0, p.cornerWindow)
-		windowStroke.Color = p.border
+		windowStroke.Color = p.isNeon and p.neonBright or p.border
+		windowStroke.Thickness = p.strokeThickness
 
 		local innerR = UDim.new(0, math.max(4, p.cornerWindow - 1))
 		innerCorner.CornerRadius = innerR
@@ -744,6 +809,13 @@ function library:AddWindow(title, options)
 		InnerFrame.BackgroundColor3 = p.bg
 		Bar.BackgroundColor3 = p.bar
 		BarCover.BackgroundColor3 = p.bar
+		if p.isNeon then
+			ensureGradient(Bar, p.bar, p.neonDeep, 0)
+			ensureGradient(BarCover, p.bar, p.neonDeep, 0)
+		else
+			removeGradient(Bar)
+			removeGradient(BarCover)
+		end
 	end)
 
 	-- Botón circular minimizar
@@ -761,12 +833,13 @@ function library:AddWindow(title, options)
 	ToggleBtn.TextSize = 13
 	ToggleBtn.ZIndex = 5
 	addCorner(ToggleBtn, 12)
-	local toggleStroke = addStroke(ToggleBtn, palette.border, 1.2, 0)
+	local toggleStroke = addStroke(ToggleBtn, palette.border, palette.strokeThickness, 0)
 
 	onThemeChange(function(p)
 		ToggleBtn.BackgroundColor3 = p.surface
 		ToggleBtn.TextColor3 = p.text
-		toggleStroke.Color = p.border
+		toggleStroke.Color = p.isNeon and p.neonBright or p.border
+		toggleStroke.Thickness = p.strokeThickness
 		ToggleBtn.Text = isOpen and p.openIcon or p.closedIcon
 	end)
 
@@ -786,7 +859,7 @@ function library:AddWindow(title, options)
 	registerTitleFont(TitleLabel)
 
 	onThemeChange(function(p)
-		TitleLabel.TextColor3 = p.text
+		TitleLabel.TextColor3 = p.isNeon and p.neonBright or p.text
 	end)
 
 	-- Panel lateral izquierdo de pestañas
@@ -807,12 +880,13 @@ function library:AddWindow(title, options)
 	TabSelection.ZIndex = 3
 	TabSelection.Visible = false
 	registerCardCorner(addCorner(TabSelection, palette.cornerCard))
-	local sbStroke = addStroke(TabSelection, palette.border, 1.2, 0)
+	local sbStroke = addStroke(TabSelection, palette.border, palette.strokeThickness, 0)
 
 	onThemeChange(function(p)
 		TabSelection.BackgroundColor3 = p.surface
-		TabSelection.ScrollBarImageColor3 = p.main
+		TabSelection.ScrollBarImageColor3 = p.isNeon and p.neonBright or p.main
 		sbStroke.Color = p.border
+		sbStroke.Thickness = p.strokeThickness
 	end)
 
 	local TabButtons = Instance.new("Frame")
@@ -853,7 +927,7 @@ function library:AddWindow(title, options)
 	Resizer.ZIndex = 10
 
 	onThemeChange(function(p)
-		Resizer.TextColor3 = p.muted
+		Resizer.TextColor3 = p.isNeon and p.neonBright or p.muted
 	end)
 
 	local savedHeight = initialSize.Y
@@ -1018,20 +1092,38 @@ function library:AddWindow(title, options)
 	end
 	window_data.ResetColors = window_data.ResetTheme
 
+	function window_data:SetNeon(enabled)
+		opts.neon = (enabled == true)
+		broadcastTheme()
+		saveWindowNeon(winKey, opts.neon)
+	end
+
+	function window_data:IsNeon()
+		return opts.neon == true
+	end
+
 	local function styleTabBtn(btn, selected)
 		local st = tabStrokes[btn]
 		if selected then
 			btn.BackgroundColor3 = palette.main
 			btn.TextColor3 = WHITE
 			if st then
-				st.Color = palette.main
+				st.Color = palette.isNeon and palette.neonBright or palette.main
+				st.Thickness = palette.strokeThickness
+			end
+			if palette.isNeon then
+				ensureGradient(btn, palette.main, palette.neonBright, 0)
+			else
+				removeGradient(btn)
 			end
 		else
 			btn.BackgroundColor3 = palette.bg
 			btn.TextColor3 = palette.muted
 			if st then
 				st.Color = palette.border
+				st.Thickness = palette.strokeThickness
 			end
+			removeGradient(btn)
 		end
 	end
 
@@ -1061,7 +1153,7 @@ function library:AddWindow(title, options)
 		tabBtn.Size = UDim2.new(1, 0, 0, 30)
 		registerBodyFont(tabBtn)
 		registerCardCorner(addCorner(tabBtn, palette.cornerCard))
-		tabStrokes[tabBtn] = addStroke(tabBtn, palette.border, 1.2, 0)
+		tabStrokes[tabBtn] = addStroke(tabBtn, palette.border, palette.strokeThickness, 0)
 
 		local tabPage = Instance.new("ScrollingFrame")
 		tabPage.Name = "Tab_" .. tab_name
@@ -1078,7 +1170,7 @@ function library:AddWindow(title, options)
 		tabPage.Visible = false
 
 		onThemeChange(function(p)
-			tabPage.ScrollBarImageColor3 = p.main
+			tabPage.ScrollBarImageColor3 = p.isNeon and p.neonBright or p.main
 			styleTabBtn(tabBtn, activeTabBtn == tabBtn)
 		end)
 
@@ -1148,11 +1240,17 @@ function library:AddWindow(title, options)
 			btn.ZIndex = 6
 			registerTitleFont(btn)
 			registerCardCorner(addCorner(btn, palette.cornerCard))
-			local btnStroke = addStroke(btn, palette.border, 1.2, 0)
+			local btnStroke = addStroke(btn, palette.border, palette.strokeThickness, 0)
 
 			onThemeChange(function(p)
 				btn.BackgroundColor3 = p.main
-				btnStroke.Color = p.border
+				btnStroke.Color = p.isNeon and p.neonBright or p.border
+				btnStroke.Thickness = p.strokeThickness
+				if p.isNeon then
+					ensureGradient(btn, p.main, p.neonBright, 0)
+				else
+					removeGradient(btn)
+				end
 			end)
 
 			runtime:Connect(btn.MouseButton1Click, function()
@@ -1163,7 +1261,7 @@ function library:AddWindow(title, options)
 		end
 
 		-- ELEMENTO: SWITCH
-		function tab_data:AddSwitch(switch_text, callback)
+		function tab_data:AddSwitch(switch_text, callback, initial_state)
 			local switch_data = {}
 			callback = typeof(callback) == "function" and callback or function() end
 
@@ -1178,7 +1276,7 @@ function library:AddWindow(title, options)
 			container.AutoButtonColor = false
 			container.ZIndex = 6
 			registerCardCorner(addCorner(container, palette.cornerCard))
-			local swStroke = addStroke(container, palette.border, 1.2, 0)
+			local swStroke = addStroke(container, palette.border, palette.strokeThickness, 0)
 
 			local titleLbl = Instance.new("TextLabel")
 			titleLbl.Name = "Title"
@@ -1203,42 +1301,54 @@ function library:AddWindow(title, options)
 			pill.Size = UDim2.new(0, 38, 0, 20)
 			pill.ZIndex = 7
 			addCorner(pill, 10)
-			local pillStroke = addStroke(pill, palette.border, 1.2, 0)
+			local pillStroke = addStroke(pill, palette.border, palette.strokeThickness, 0)
 
 			local knob = Instance.new("Frame")
 			knob.Name = "Knob"
 			knob.Parent = pill
-			knob.BackgroundColor3 = palette.text
+			knob.BackgroundColor3 = palette.muted
 			knob.BorderSizePixel = 0
 			knob.Position = UDim2.new(0, 3, 0.5, -7)
 			knob.Size = UDim2.new(0, 14, 0, 14)
 			knob.ZIndex = 8
 			addCorner(knob, 7)
 
-			local toggled = false
+			local toggled = (initial_state == true)
 
 			local function syncSwitchTheme(p)
 				container.BackgroundColor3 = p.surface
-				swStroke.Color = p.border
-				titleLbl.TextColor3 = p.text
-				pillStroke.Color = p.border
+				swStroke.Color = (toggled and p.isNeon) and p.neonBright or p.border
+				swStroke.Thickness = p.strokeThickness
+				titleLbl.TextColor3 = (toggled and p.isNeon) and p.neonBright or p.text
+				pillStroke.Color = (toggled and p.isNeon) and p.neonBright or p.border
+				pillStroke.Thickness = p.strokeThickness
 				if toggled then
 					pill.BackgroundColor3 = p.main
 					knob.BackgroundColor3 = WHITE
+					knob.Position = UDim2.new(1, -17, 0.5, -7)
+					if p.isNeon then
+						ensureGradient(pill, p.main, p.neonBright, 0)
+					else
+						removeGradient(pill)
+					end
 				else
 					pill.BackgroundColor3 = p.bg
 					knob.BackgroundColor3 = p.muted
+					knob.Position = UDim2.new(0, 3, 0.5, -7)
+					removeGradient(pill)
 				end
 			end
 
 			onThemeChange(syncSwitchTheme)
 
-			local function updateVisual(state)
+			local function updateVisual(state, animate)
 				syncSwitchTheme(palette)
-				if state then
-					Tween(knob, {Position = UDim2.new(1, -17, 0.5, -7)})
-				else
-					Tween(knob, {Position = UDim2.new(0, 3, 0.5, -7)})
+				if animate then
+					if state then
+						Tween(knob, {Position = UDim2.new(1, -17, 0.5, -7)})
+					else
+						Tween(knob, {Position = UDim2.new(0, 3, 0.5, -7)})
+					end
 				end
 			end
 
@@ -1251,19 +1361,51 @@ function library:AddWindow(title, options)
 
 			runtime:Connect(container.MouseButton1Click, function()
 				toggled = not toggled
-				updateVisual(toggled)
+				updateVisual(toggled, true)
 				pcall(callback, toggled)
 			end)
 
 			function switch_data:Set(bool)
 				if not runtime.Alive then return end
 				toggled = (typeof(bool) == "boolean") and bool or false
-				updateVisual(toggled)
+				updateVisual(toggled, true)
 				pcall(callback, toggled)
+			end
+
+			function switch_data:SyncState(bool)
+				if not runtime.Alive then return end
+				toggled = (typeof(bool) == "boolean") and bool or false
+				updateVisual(toggled, false)
+			end
+
+			function switch_data:Get()
+				return toggled
 			end
 
 			return switch_data, container
 		end
+
+		-- BOTÓN / SWITCH DEDICADO: MODO NEÓN (Apagado = Sólido / Encendido = Neón)
+		function tab_data:AddNeonSwitch(label_text, callback)
+			local text = tostring(label_text or "Modo Neón")
+			local swCtrl, swFrame = tab_data:AddSwitch(text, function(isNeonEnabled)
+				window_data:SetNeon(isNeonEnabled)
+				if typeof(callback) == "function" then
+					pcall(callback, isNeonEnabled)
+				end
+			end, opts.neon)
+
+			swCtrl:SyncState(opts.neon)
+			neonSwitchController = {
+				SyncVisual = function(state)
+					swCtrl:SyncState(state)
+				end,
+			}
+
+			return swCtrl, swFrame
+		end
+
+		tab_data.AddModeSwitch = tab_data.AddNeonSwitch
 
 		-- ELEMENTO: SLIDER
 		function tab_data:AddSlider(slider_text, callback, slider_options)
@@ -1282,7 +1424,7 @@ function library:AddWindow(title, options)
 			container.Size = UDim2.new(1, 0, 0, 44)
 			container.ZIndex = 6
 			registerCardCorner(addCorner(container, palette.cornerCard))
-			local slStroke = addStroke(container, palette.border, 1.2, 0)
+			local slStroke = addStroke(container, palette.border, palette.strokeThickness, 0)
 
 			local titleLbl = Instance.new("TextLabel")
 			titleLbl.Name = "Title"
@@ -1344,11 +1486,17 @@ function library:AddWindow(title, options)
 			onThemeChange(function(p)
 				container.BackgroundColor3 = p.surface
 				slStroke.Color = p.border
+				slStroke.Thickness = p.strokeThickness
 				titleLbl.TextColor3 = p.text
-				valLbl.TextColor3 = p.muted
+				valLbl.TextColor3 = p.isNeon and p.neonBright or p.muted
 				track.BackgroundColor3 = p.bg
 				trackStroke.Color = p.border
 				fill.BackgroundColor3 = p.main
+				if p.isNeon then
+					ensureGradient(fill, p.main, p.neonBright, 0)
+				else
+					removeGradient(fill)
+				end
 			end)
 
 			local hitArea = Instance.new("TextButton")
@@ -1385,7 +1533,7 @@ function library:AddWindow(title, options)
 					if beginPointerDrag(input, updateFromInput, function()
 						slStroke.Color = palette.border
 					end) then
-						slStroke.Color = palette.main
+						slStroke.Color = palette.isNeon and palette.neonBright or palette.main
 						updateFromInput(input.Position)
 					end
 				end
@@ -1423,17 +1571,18 @@ function library:AddWindow(title, options)
 			box.ZIndex = 6
 			registerBodyFont(box)
 			registerCardCorner(addCorner(box, palette.cornerCard))
-			local boxStroke = addStroke(box, palette.border, 1.2, 0)
+			local boxStroke = addStroke(box, palette.border, palette.strokeThickness, 0)
 
 			onThemeChange(function(p)
 				box.BackgroundColor3 = p.surface
 				box.PlaceholderColor3 = p.muted
 				box.TextColor3 = p.text
-				boxStroke.Color = box:IsFocused() and p.main or p.border
+				boxStroke.Thickness = p.strokeThickness
+				boxStroke.Color = box:IsFocused() and (p.isNeon and p.neonBright or p.main) or p.border
 			end)
 
 			runtime:Connect(box.Focused, function()
-				boxStroke.Color = palette.main
+				boxStroke.Color = palette.isNeon and palette.neonBright or palette.main
 			end)
 
 			runtime:Connect(box.FocusLost, function(enterPressed)
@@ -1463,7 +1612,7 @@ function library:AddWindow(title, options)
 			wrapper.Size = UDim2.new(1, 0, 0, 32)
 			wrapper.ZIndex = 6
 			registerCardCorner(addCorner(wrapper, palette.cornerCard))
-			local ddStroke = addStroke(wrapper, palette.border, 1.2, 0)
+			local ddStroke = addStroke(wrapper, palette.border, palette.strokeThickness, 0)
 
 			local headerBtn = Instance.new("TextButton")
 			headerBtn.Name = "Header"
@@ -1509,10 +1658,11 @@ function library:AddWindow(title, options)
 
 			onThemeChange(function(p)
 				wrapper.BackgroundColor3 = p.surface
-				ddStroke.Color = isExpanded and p.main or p.border
+				ddStroke.Color = isExpanded and (p.isNeon and p.neonBright or p.main) or p.border
+				ddStroke.Thickness = p.strokeThickness
 				headerBtn.TextColor3 = p.text
 				arrow.TextColor3 = p.muted
-				listFrame.ScrollBarImageColor3 = p.main
+				listFrame.ScrollBarImageColor3 = p.isNeon and p.neonBright or p.main
 				for _, itemBtn in pairs(itemsMap) do
 					if itemBtn and itemBtn.Parent then
 						itemBtn.BackgroundColor3 = p.bg
@@ -1531,7 +1681,7 @@ function library:AddWindow(title, options)
 				for _ in pairs(itemsMap) do count = count + 1 end
 				local targetListH = math.min(count * 28, 130)
 				listFrame.Size = UDim2.new(1, -12, 0, targetListH)
-				ddStroke.Color = isExpanded and palette.main or palette.border
+				ddStroke.Color = isExpanded and (palette.isNeon and palette.neonBright or palette.main) or palette.border
 				Tween(wrapper, {Size = UDim2.new(1, 0, 0, isExpanded and (38 + targetListH) or 32)})
 			end
 
@@ -1607,7 +1757,7 @@ function library:AddWindow(title, options)
 			return dropdown_data, wrapper
 		end
 
-		-- ELEMENTO: SELECTOR DESPLEGABLE DE TEMAS
+		-- ELEMENTO: SELECTOR DESPLEGABLE DE TEMAS (nombre limpio sin emojis)
 		function tab_data:AddThemeSelector(selector_text, callback)
 			local selector_data = {}
 			selector_text = tostring(selector_text or "Tema de Interfaz")
@@ -1622,7 +1772,7 @@ function library:AddWindow(title, options)
 			wrapper.Size = UDim2.new(1, 0, 0, 34)
 			wrapper.ZIndex = 6
 			registerCardCorner(addCorner(wrapper, palette.cornerCard))
-			local tsStroke = addStroke(wrapper, palette.border, 1.2, 0)
+			local tsStroke = addStroke(wrapper, palette.border, palette.strokeThickness, 0)
 
 			local headerBtn = Instance.new("TextButton")
 			headerBtn.Name = "Header"
@@ -1693,13 +1843,13 @@ function library:AddWindow(title, options)
 
 			local function refreshOptionHighlights()
 				titleLbl.Text = selector_text .. ": " .. opts.theme_name
-				activeDot.BackgroundColor3 = palette.main
+				activeDot.BackgroundColor3 = palette.isNeon and palette.neonBright or palette.main
 				for name, rowData in pairs(themeOptionRows) do
 					local isCurrent = (name == opts.theme_name)
 					rowData.btn.BackgroundColor3 = isCurrent and palette.main or rowData.baseBg
 					rowData.nameLbl.TextColor3 = isCurrent and WHITE or rowData.baseText
-					rowData.iconLbl.TextColor3 = isCurrent and WHITE or rowData.baseText
-					rowData.stroke.Color = isCurrent and rowData.accent or rowData.baseBorder
+					rowData.stroke.Color = isCurrent and (palette.isNeon and shiftColor(rowData.accent, 0.32) or rowData.accent) or rowData.baseBorder
+					rowData.stroke.Thickness = isCurrent and palette.strokeThickness or 1.1
 				end
 			end
 
@@ -1732,31 +1882,19 @@ function library:AddWindow(title, options)
 				nameLbl.Parent = optBtn
 				nameLbl.BackgroundTransparency = 1
 				nameLbl.Position = UDim2.new(0, 32, 0, 0)
-				nameLbl.Size = UDim2.new(1, -110, 1, 0)
+				nameLbl.Size = UDim2.new(1, -42, 1, 0)
 				nameLbl.Font = tInfo.font_title
 				nameLbl.Text = tName
 				nameLbl.TextColor3 = tInfo.text_color
 				nameLbl.TextSize = 13
+				nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
 				nameLbl.TextXAlignment = Enum.TextXAlignment.Left
 				nameLbl.ZIndex = 9
-
-				local iconPreviewLbl = Instance.new("TextLabel")
-				iconPreviewLbl.Parent = optBtn
-				iconPreviewLbl.BackgroundTransparency = 1
-				iconPreviewLbl.Position = UDim2.new(1, -76, 0, 0)
-				iconPreviewLbl.Size = UDim2.new(0, 68, 1, 0)
-				iconPreviewLbl.Font = Enum.Font.GothamBold
-				iconPreviewLbl.Text = (tInfo.gui_icon or "⚙️") .. " " .. (tInfo.open_icon or "📽️") .. " " .. (tInfo.closed_icon or "❤️‍🔥")
-				iconPreviewLbl.TextColor3 = tInfo.text_color
-				iconPreviewLbl.TextSize = 11
-				iconPreviewLbl.TextXAlignment = Enum.TextXAlignment.Right
-				iconPreviewLbl.ZIndex = 9
 
 				themeOptionRows[tName] = {
 					btn = optBtn,
 					stroke = optStroke,
 					nameLbl = nameLbl,
-					iconLbl = iconPreviewLbl,
 					baseBg = tInfo.bg_color,
 					baseText = tInfo.text_color,
 					baseBorder = tInfo.border_color,
@@ -1776,10 +1914,11 @@ function library:AddWindow(title, options)
 
 			onThemeChange(function(p)
 				wrapper.BackgroundColor3 = p.surface
-				tsStroke.Color = isExpanded and p.main or p.border
+				tsStroke.Color = isExpanded and (p.isNeon and p.neonBright or p.main) or p.border
+				tsStroke.Thickness = p.strokeThickness
 				titleLbl.TextColor3 = p.text
 				arrow.TextColor3 = p.muted
-				listFrame.ScrollBarImageColor3 = p.main
+				listFrame.ScrollBarImageColor3 = p.isNeon and p.neonBright or p.main
 				refreshOptionHighlights()
 			end)
 
@@ -1787,7 +1926,7 @@ function library:AddWindow(title, options)
 				isExpanded = not isExpanded
 				dropdown_open = isExpanded
 				Tween(arrow, {Rotation = isExpanded and 180 or 0})
-				tsStroke.Color = isExpanded and palette.main or palette.border
+				tsStroke.Color = isExpanded and (palette.isNeon and palette.neonBright or palette.main) or palette.border
 				local listH = math.min(#THEME_ORDER * 33, 150)
 				listFrame.Size = UDim2.new(1, -16, 0, listH)
 				Tween(wrapper, {Size = UDim2.new(1, 0, 0, isExpanded and (44 + listH) or 34)})
@@ -1820,7 +1959,7 @@ function library:AddWindow(title, options)
 			folderBox.Size = UDim2.new(1, 0, 0, 32)
 			folderBox.ZIndex = 6
 			registerCardCorner(addCorner(folderBox, palette.cornerCard))
-			local fldStroke = addStroke(folderBox, palette.border, 1.2, 0)
+			local fldStroke = addStroke(folderBox, palette.border, palette.strokeThickness, 0)
 
 			local folderBtn = Instance.new("TextButton")
 			folderBtn.Name = "Header"
@@ -1839,9 +1978,10 @@ function library:AddWindow(title, options)
 
 			onThemeChange(function(p)
 				folderBox.BackgroundColor3 = p.surface
-				fldStroke.Color = p.border
+				fldStroke.Color = p.isNeon and p.neonBright or p.border
+				fldStroke.Thickness = p.strokeThickness
 				folderBtn.BackgroundColor3 = p.bar
-				folderBtn.TextColor3 = p.text
+				folderBtn.TextColor3 = p.isNeon and p.neonBright or p.text
 			end)
 
 			local content = Instance.new("Frame")
