@@ -19,9 +19,14 @@ end
 
 function runtime:Spawn(callback, ...) return self:Schedule(nativeTask.spawn, callback, ...) end
 function runtime:Defer(callback, ...) return self:Schedule(nativeTask.defer, callback, ...) end
+
 function runtime:Connect(signal, callback)
 	if not self.Alive then return end
-	local connection = signal:Connect(function(...) self:Spawn(callback, ...) end)
+	local connection = signal:Connect(function(...)
+		if self.Alive then
+			callback(...)
+		end
+	end)
 	self.Connections[connection] = true
 	return connection
 end
@@ -60,6 +65,10 @@ do
 	isSolara = success and type(executorName) == "string" and string.lower(executorName) == "solara"
 end
 
+local WHITE = Color3.new(1, 1, 1)
+local BLACK = Color3.new(0, 0, 0)
+local DEFAULT_TWEEN = TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
 local ui_options = {
 	main_color = Color3.fromRGB(162, 62, 255),
 	bg_color = Color3.fromRGB(16, 15, 21),
@@ -69,6 +78,17 @@ local ui_options = {
 	can_resize = true,
 }
 
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local cloneref = type(cloneref) == "function" and cloneref or function(...) return ... end
+
+local CoreGui
+if not isSolara then pcall(function() CoreGui = cloneref(game:GetService("CoreGui")) end) end
+
+-- Limpieza rápida y directa sin recorrer todo el mapa
 do
 	local function destroyImguiIn(parent)
 		if parent and parent.FindFirstChild then
@@ -79,48 +99,25 @@ do
 		end
 	end
 
-	if not isSolara then pcall(function() destroyImguiIn(game:GetService("CoreGui")) end) end
-	local Players = game:GetService("Players")
-	if Players and Players.LocalPlayer then destroyImguiIn(Players.LocalPlayer:FindFirstChild("PlayerGui")) end
+	if CoreGui then pcall(function() destroyImguiIn(CoreGui) end) end
+	if LocalPlayer then destroyImguiIn(LocalPlayer:FindFirstChild("PlayerGui")) end
 	if not isSolara and type(gethui) == "function" then
 		local ok, gh = pcall(gethui)
 		if ok and gh then destroyImguiIn(gh) end
 	end
-	if not isSolara then
-		for _, v in ipairs(game:GetDescendants()) do
-			if (v.Name == "imgui" or v.Name == "ToggleUI") and v:IsA("ScreenGui") then
-				pcall(function() v:Destroy() end)
-			end
-		end
-	end
 end
 
-local UIS = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local HttpService = game:GetService("HttpService")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local cloneref = type(cloneref) == "function" and cloneref or function(...) return ... end
-
-local CoreGui
-if not isSolara then pcall(function() CoreGui = game:GetService("CoreGui") end) end
-if CoreGui then pcall(function() CoreGui = cloneref(CoreGui) end) end
-
--- Sistema de guardado persistente sin lag (Debounce en disco)
+-- Sistema de guardado persistente con escritura diferida (Debounce)
 local CONFIG_FILE = "UniversalUI_Config.json"
 _G.UniversalUISavedConfig = _G.UniversalUISavedConfig or {}
 
 do
 	if type(isfile) == "function" and type(readfile) == "function" then
 		local ok, raw = pcall(function()
-			if isfile(CONFIG_FILE) then
-				return readfile(CONFIG_FILE)
-			end
+			return isfile(CONFIG_FILE) and readfile(CONFIG_FILE) or nil
 		end)
 		if ok and type(raw) == "string" and #raw > 0 then
-			local decOk, decoded = pcall(function()
-				return HttpService:JSONDecode(raw)
-			end)
+			local decOk, decoded = pcall(HttpService.JSONDecode, HttpService, raw)
 			if decOk and type(decoded) == "table" then
 				for k, v in pairs(decoded) do
 					_G.UniversalUISavedConfig[k] = v
@@ -134,11 +131,10 @@ local pendingWrite = false
 local function flushConfigFile()
 	if pendingWrite or type(writefile) ~= "function" then return end
 	pendingWrite = true
-	nativeTask.delay(0.35, function()
+	nativeTask.delay(0.4, function()
 		pendingWrite = false
 		pcall(function()
-			local encoded = HttpService:JSONEncode(_G.UniversalUISavedConfig)
-			writefile(CONFIG_FILE, encoded)
+			writefile(CONFIG_FILE, HttpService:JSONEncode(_G.UniversalUISavedConfig))
 		end)
 	end)
 end
@@ -163,9 +159,10 @@ local function tableToColor(t)
 end
 
 local function saveWindowSize(winKey, width, height)
-	_G.UniversalUISavedConfig[winKey] = _G.UniversalUISavedConfig[winKey] or {}
-	_G.UniversalUISavedConfig[winKey].w = math.floor(width)
-	_G.UniversalUISavedConfig[winKey].h = math.floor(height)
+	local entry = _G.UniversalUISavedConfig[winKey] or {}
+	entry.w = math.floor(width)
+	entry.h = math.floor(height)
+	_G.UniversalUISavedConfig[winKey] = entry
 	flushConfigFile()
 end
 
@@ -178,16 +175,11 @@ local function getSavedWindowSize(winKey)
 end
 
 local function saveWindowColors(winKey, mainCol, bgCol, textCol)
-	_G.UniversalUISavedConfig[winKey] = _G.UniversalUISavedConfig[winKey] or {}
-	if typeof(mainCol) == "Color3" then
-		_G.UniversalUISavedConfig[winKey].main_color = colorToTable(mainCol)
-	end
-	if typeof(bgCol) == "Color3" then
-		_G.UniversalUISavedConfig[winKey].bg_color = colorToTable(bgCol)
-	end
-	if typeof(textCol) == "Color3" then
-		_G.UniversalUISavedConfig[winKey].text_color = colorToTable(textCol)
-	end
+	local entry = _G.UniversalUISavedConfig[winKey] or {}
+	if typeof(mainCol) == "Color3" then entry.main_color = colorToTable(mainCol) end
+	if typeof(bgCol) == "Color3" then entry.bg_color = colorToTable(bgCol) end
+	if typeof(textCol) == "Color3" then entry.text_color = colorToTable(textCol) end
+	_G.UniversalUISavedConfig[winKey] = entry
 	flushConfigFile()
 end
 
@@ -209,16 +201,15 @@ local function getSavedWindowColors(winKey)
 	return nil, nil, nil
 end
 
--- Mezcla limpia entre colores sin distorsionar el tono a azul
 local function blendColor(base, target, alpha)
 	return base:Lerp(target, math.clamp(alpha, 0, 1))
 end
 
 local function shiftColor(c, delta)
 	if delta >= 0 then
-		return c:Lerp(Color3.new(1, 1, 1), math.clamp(delta, 0, 1))
+		return c:Lerp(WHITE, math.clamp(delta, 0, 1))
 	else
-		return c:Lerp(Color3.new(0, 0, 0), math.clamp(-delta, 0, 1))
+		return c:Lerp(BLACK, math.clamp(-delta, 0, 1))
 	end
 end
 
@@ -247,7 +238,44 @@ local function setCameraLocked(locked)
 	end
 end
 
+-- Controlador único centralizado para todos los gestos de arrastre y deslizadores
+local activePointer = nil
+
+local function beginPointerDrag(input, onMove, onEnd)
+	if activePointer then return false end
+	activePointer = {
+		input = input,
+		onMove = onMove,
+		onEnd = onEnd,
+	}
+	setCameraLocked(true)
+	return true
+end
+
+runtime:Connect(UIS.InputChanged, function(input)
+	local ptr = activePointer
+	if not ptr then return end
+	if input == ptr.input or input.UserInputType == Enum.UserInputType.MouseMovement then
+		if ptr.onMove then
+			ptr.onMove(input.Position)
+		end
+	end
+end)
+
+runtime:Connect(UIS.InputEnded, function(input)
+	local ptr = activePointer
+	if not ptr then return end
+	if input == ptr.input or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		activePointer = nil
+		setCameraLocked(false)
+		if ptr.onEnd then
+			ptr.onEnd(input.Position)
+		end
+	end
+end)
+
 runtime:AddCleanup(function()
+	activePointer = nil
 	cameraLocks = 0
 	local cam = workspace.CurrentCamera
 	if cam and savedCameraType ~= nil and cam.CameraType == Enum.CameraType.Scriptable then
@@ -317,7 +345,6 @@ windowsFrame.Size = UDim2.new(1, 0, 1, 0)
 
 local checks = { binding = false }
 
--- Tecla rápida PC
 runtime:Connect(UIS.InputBegan, function(input, gameProcessed)
 	if gameProcessed then return end
 	local toggleKey = (typeof(ui_options.toggle_key) == "EnumItem") and ui_options.toggle_key or Enum.KeyCode.RightShift
@@ -345,7 +372,7 @@ floatingBtn.Size = UDim2.new(0, btnSize, 0, btnSize)
 floatingBtn.Font = Enum.Font.GothamBold
 floatingBtn.Text = "⚙️"
 floatingBtn.TextSize = isCompactDevice() and 18 or 20
-floatingBtn.TextColor3 = Color3.new(1, 1, 1)
+floatingBtn.TextColor3 = WHITE
 floatingBtn.AutoButtonColor = false
 floatingBtn.ZIndex = 100
 
@@ -360,25 +387,15 @@ floatingStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 floatingStroke.Parent = floatingBtn
 
 do
-	local isDragging, dragInput, dragStart, startPos, hasMoved = false, nil, nil, nil, false
+	local dragStart, startPos, hasMoved = nil, nil, false
 
 	runtime:Connect(floatingBtn.InputBegan, function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			if not isDragging then
-				isDragging = true
-				dragInput = input
-				hasMoved = false
-				dragStart = input.Position
-				startPos = floatingBtn.Position
-				setCameraLocked(true)
-			end
-		end
-	end)
-
-	runtime:Connect(UIS.InputChanged, function(input)
-		if isDragging and (input == dragInput or input.UserInputType == Enum.UserInputType.MouseMovement) then
-			if dragStart then
-				local delta = input.Position - dragStart
+			hasMoved = false
+			dragStart = input.Position
+			startPos = floatingBtn.Position
+			beginPointerDrag(input, function(pos)
+				local delta = pos - dragStart
 				if math.abs(delta.X) > 6 or math.abs(delta.Y) > 6 then
 					hasMoved = true
 					floatingBtn.Position = UDim2.new(
@@ -386,26 +403,18 @@ do
 						startPos.Y.Scale, startPos.Y.Offset + delta.Y
 					)
 				end
-			end
-		end
-	end)
-
-	runtime:Connect(UIS.InputEnded, function(input)
-		if isDragging and (input == dragInput or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-			isDragging = false
-			dragInput = nil
-			setCameraLocked(false)
-			if not hasMoved and not checks.binding then
-				imgui.Enabled = not imgui.Enabled
-			end
+			end, function()
+				if not hasMoved and not checks.binding then
+					imgui.Enabled = not imgui.Enabled
+				end
+			end)
 		end
 	end)
 end
 
 -- Utilidades ligeras
-local function Tween(obj, props, duration)
-	local info = TweenInfo.new(duration or 0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	local tw = TweenService:Create(obj, info, props)
+local function Tween(obj, props, info)
+	local tw = TweenService:Create(obj, info or DEFAULT_TWEEN, props)
 	tw:Play()
 	return tw
 end
@@ -427,41 +436,22 @@ local function addStroke(parent, color, thickness, transparency)
 	return s
 end
 
--- Arrastre fluido desde el contorno exterior y la barra superior
 local function bindWindowDrag(targetFrame, handles)
-	local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
-
 	for _, handle in ipairs(handles) do
 		runtime:Connect(handle.InputBegan, function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-				if not dragging then
-					dragging = true
-					dragInput = input
-					dragStart = input.Position
-					startPos = targetFrame.Position
-					setCameraLocked(true)
-				end
+				local dragStart = input.Position
+				local startPos = targetFrame.Position
+				beginPointerDrag(input, function(pos)
+					local delta = pos - dragStart
+					targetFrame.Position = UDim2.new(
+						startPos.X.Scale, startPos.X.Offset + delta.X,
+						startPos.Y.Scale, startPos.Y.Offset + delta.Y
+					)
+				end)
 			end
 		end)
 	end
-
-	runtime:Connect(UIS.InputChanged, function(input)
-		if dragging and (input == dragInput or input.UserInputType == Enum.UserInputType.MouseMovement) then
-			local delta = input.Position - dragStart
-			targetFrame.Position = UDim2.new(
-				startPos.X.Scale, startPos.X.Offset + delta.X,
-				startPos.Y.Scale, startPos.Y.Offset + delta.Y
-			)
-		end
-	end)
-
-	runtime:Connect(UIS.InputEnded, function(input)
-		if dragging and (input == dragInput or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-			dragging = false
-			dragInput = nil
-			setCameraLocked(false)
-		end
-	end)
 end
 
 local windows = 0
@@ -512,21 +502,53 @@ function library:AddWindow(title, options)
 		tween_time = 0.15,
 	}
 
+	-- Paleta cacheada (calculada una sola vez por cambio de tema)
+	local palette = {}
+	local function rebuildPalette()
+		local m, bg, txt = opts.main_color, opts.bg_color, opts.text_color
+		palette.main = m
+		palette.bg = bg
+		palette.text = txt
+		palette.winBg = blendColor(bg, m, 0.28)
+		palette.winStroke = shiftColor(m, 0.15)
+		palette.innerRim = blendColor(bg, m, 0.45)
+		palette.barBg = blendColor(bg, m, 0.58)
+		palette.glowLine = shiftColor(m, 0.18)
+		palette.sidebarBg = shiftColor(bg, 0.025)
+		palette.cardBg = shiftColor(bg, 0.04)
+		palette.cardStroke = shiftColor(bg, 0.13)
+		palette.activeBg = blendColor(bg, m, 0.22)
+		palette.activeTabBg = blendColor(bg, m, 0.24)
+		palette.activeStroke = shiftColor(m, 0.2)
+		palette.tabTextOff = shiftColor(txt, -0.15)
+		palette.pillOff = shiftColor(bg, 0.12)
+		palette.valText = shiftColor(m, 0.3)
+		palette.placeholder = shiftColor(txt, -0.32)
+		palette.itemBg = shiftColor(bg, 0.07)
+		palette.btnHover = shiftColor(m, 0.08)
+		palette.btnPress = shiftColor(m, 0.22)
+		palette.btnStroke = shiftColor(m, 0.25)
+		palette.folderHeader = blendColor(bg, m, 0.45)
+		palette.floatingBg = shiftColor(bg, 0.03)
+	end
+	rebuildPalette()
+
 	local themeCallbacks = {}
 	local function onThemeChange(fn)
 		table.insert(themeCallbacks, fn)
-		pcall(fn, opts)
+		pcall(fn, palette)
 	end
 	local function broadcastTheme()
-		floatingStroke.Color = opts.main_color
-		floatingBtn.BackgroundColor3 = shiftColor(opts.bg_color, 0.03)
-		for _, fn in ipairs(themeCallbacks) do
-			pcall(fn, opts)
+		rebuildPalette()
+		floatingStroke.Color = palette.main
+		floatingBtn.BackgroundColor3 = palette.floatingBg
+		for i = 1, #themeCallbacks do
+			pcall(themeCallbacks[i], palette)
 		end
 	end
 
-	floatingStroke.Color = opts.main_color
-	floatingBtn.BackgroundColor3 = shiftColor(opts.bg_color, 0.03)
+	floatingStroke.Color = palette.main
+	floatingBtn.BackgroundColor3 = palette.floatingBg
 
 	local startX = math.max(12, math.floor((vp.X - initialSize.X) / 2) + ((windows - 1) * 18))
 	local startY = math.clamp(60 + ((windows - 1) * 18), 54, math.max(54, vp.Y - initialSize.Y - 12))
@@ -534,37 +556,37 @@ function library:AddWindow(title, options)
 	local BORDER_THICKNESS = 4
 	local MINIMIZED_HEIGHT = 34 + (BORDER_THICKNESS * 2)
 
-	-- Marco Exterior Oscuro con Contorno Neón Morado (Igual que las imágenes de referencia)
+	-- Marco Exterior Oscuro con Contorno Neón Morado
 	local Window = Instance.new("Frame")
 	Window.Name = "Window_" .. windows
 	Window.Parent = windowsFrame
 	Window.Active = true
-	Window.BackgroundColor3 = blendColor(opts.bg_color, opts.main_color, 0.28)
+	Window.BackgroundColor3 = palette.winBg
 	Window.BorderSizePixel = 0
 	Window.ClipsDescendants = true
 	Window.Position = UDim2.new(0, startX, 0, startY)
 	Window.Size = UDim2.new(0, initialSize.X, 0, initialSize.Y)
 	addCorner(Window, 14)
-	local windowNeonStroke = addStroke(Window, shiftColor(opts.main_color, 0.15), 2.2, 0)
+	local windowNeonStroke = addStroke(Window, palette.winStroke, 2.2, 0)
 
 	-- Contenedor Interior Carbón Oscuro
 	local InnerFrame = Instance.new("Frame")
 	InnerFrame.Name = "Inner"
 	InnerFrame.Parent = Window
-	InnerFrame.BackgroundColor3 = opts.bg_color
+	InnerFrame.BackgroundColor3 = palette.bg
 	InnerFrame.BorderSizePixel = 0
 	InnerFrame.ClipsDescendants = true
 	InnerFrame.Position = UDim2.new(0, BORDER_THICKNESS, 0, BORDER_THICKNESS)
 	InnerFrame.Size = UDim2.new(1, -(BORDER_THICKNESS * 2), 1, -(BORDER_THICKNESS * 2))
 	addCorner(InnerFrame, 11)
-	local innerRimStroke = addStroke(InnerFrame, blendColor(opts.bg_color, opts.main_color, 0.45), 1.3, 0.25)
+	local innerRimStroke = addStroke(InnerFrame, palette.innerRim, 1.3, 0.25)
 
 	-- Barra Superior Morada Oscura con línea de brillo neón
 	local Bar = Instance.new("Frame")
 	Bar.Name = "Bar"
 	Bar.Parent = InnerFrame
 	Bar.Active = true
-	Bar.BackgroundColor3 = blendColor(opts.bg_color, opts.main_color, 0.58)
+	Bar.BackgroundColor3 = palette.barBg
 	Bar.BorderSizePixel = 0
 	Bar.Size = UDim2.new(1, 0, 0, 34)
 	addCorner(Bar, 11)
@@ -572,7 +594,7 @@ function library:AddWindow(title, options)
 	local BarCover = Instance.new("Frame")
 	BarCover.Name = "BarCover"
 	BarCover.Parent = Bar
-	BarCover.BackgroundColor3 = blendColor(opts.bg_color, opts.main_color, 0.58)
+	BarCover.BackgroundColor3 = palette.barBg
 	BarCover.BorderSizePixel = 0
 	BarCover.Position = UDim2.new(0, 0, 0.5, 0)
 	BarCover.Size = UDim2.new(1, 0, 0.5, 0)
@@ -580,24 +602,22 @@ function library:AddWindow(title, options)
 	local barGlowLine = Instance.new("Frame")
 	barGlowLine.Name = "GlowLine"
 	barGlowLine.Parent = Bar
-	barGlowLine.BackgroundColor3 = shiftColor(opts.main_color, 0.18)
+	barGlowLine.BackgroundColor3 = palette.glowLine
 	barGlowLine.BorderSizePixel = 0
 	barGlowLine.Position = UDim2.new(0, 0, 1, -1)
 	barGlowLine.Size = UDim2.new(1, 0, 0, 2)
 	barGlowLine.ZIndex = 4
 
-	-- Arrastre limpio desde todo el marco exterior y la barra superior
 	bindWindowDrag(Window, {Window, Bar})
 
-	onThemeChange(function(c)
-		Window.BackgroundColor3 = blendColor(c.bg_color, c.main_color, 0.28)
-		windowNeonStroke.Color = shiftColor(c.main_color, 0.15)
-		InnerFrame.BackgroundColor3 = c.bg_color
-		innerRimStroke.Color = blendColor(c.bg_color, c.main_color, 0.45)
-		local topTone = blendColor(c.bg_color, c.main_color, 0.58)
-		Bar.BackgroundColor3 = topTone
-		BarCover.BackgroundColor3 = topTone
-		barGlowLine.BackgroundColor3 = shiftColor(c.main_color, 0.18)
+	onThemeChange(function(p)
+		Window.BackgroundColor3 = p.winBg
+		windowNeonStroke.Color = p.winStroke
+		InnerFrame.BackgroundColor3 = p.bg
+		innerRimStroke.Color = p.innerRim
+		Bar.BackgroundColor3 = p.barBg
+		BarCover.BackgroundColor3 = p.barBg
+		barGlowLine.BackgroundColor3 = p.glowLine
 	end)
 
 	-- Botón Circular Minimizar
@@ -609,11 +629,15 @@ function library:AddWindow(title, options)
 	ToggleBtn.Size = UDim2.new(0, 24, 0, 24)
 	ToggleBtn.Font = Enum.Font.GothamBold
 	ToggleBtn.Text = "📽️"
-	ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
+	ToggleBtn.TextColor3 = WHITE
 	ToggleBtn.TextSize = 13
 	ToggleBtn.ZIndex = 5
 	addCorner(ToggleBtn, 12)
-	addStroke(ToggleBtn, shiftColor(opts.main_color, 0.15), 1.5, 0.2)
+	local toggleStroke = addStroke(ToggleBtn, palette.winStroke, 1.5, 0.2)
+
+	onThemeChange(function(p)
+		toggleStroke.Color = p.winStroke
+	end)
 
 	-- Título de la Ventana
 	local TitleLabel = Instance.new("TextLabel")
@@ -624,34 +648,34 @@ function library:AddWindow(title, options)
 	TitleLabel.Size = UDim2.new(1, -48, 1, 0)
 	TitleLabel.Font = Enum.Font.GothamBold
 	TitleLabel.Text = tostring(title or "New Window")
-	TitleLabel.TextColor3 = Color3.new(1, 1, 1)
+	TitleLabel.TextColor3 = WHITE
 	TitleLabel.TextSize = 14
 	TitleLabel.TextTruncate = Enum.TextTruncate.AtEnd
 	TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 	TitleLabel.ZIndex = 3
 
-	-- Panel Lateral Izquierdo de Pestañas (Estilo contenedor oscuro con divisor)
+	-- Panel Lateral Izquierdo de Pestañas
 	local sidebarW = isCompactDevice() and 96 or 114
 
 	local TabSelection = Instance.new("ScrollingFrame")
 	TabSelection.Name = "TabSelection"
 	TabSelection.Parent = InnerFrame
-	TabSelection.BackgroundColor3 = shiftColor(opts.bg_color, 0.025)
+	TabSelection.BackgroundColor3 = palette.sidebarBg
 	TabSelection.BorderSizePixel = 0
 	TabSelection.Position = UDim2.new(0, 8, 0, 42)
 	TabSelection.Size = UDim2.new(0, sidebarW, 1, -50)
 	TabSelection.CanvasSize = UDim2.new(0, 0, 0, 0)
 	TabSelection.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	TabSelection.ScrollBarThickness = 3
-	TabSelection.ScrollBarImageColor3 = opts.main_color
+	TabSelection.ScrollBarImageColor3 = palette.main
 	TabSelection.Visible = false
 	addCorner(TabSelection, 10)
-	local sbStroke = addStroke(TabSelection, Color3.fromRGB(44, 44, 52), 1.5, 0)
+	local sbStroke = addStroke(TabSelection, palette.cardStroke, 1.5, 0)
 
-	onThemeChange(function(c)
-		TabSelection.BackgroundColor3 = shiftColor(c.bg_color, 0.025)
-		TabSelection.ScrollBarImageColor3 = c.main_color
-		sbStroke.Color = shiftColor(c.bg_color, 0.12)
+	onThemeChange(function(p)
+		TabSelection.BackgroundColor3 = p.sidebarBg
+		TabSelection.ScrollBarImageColor3 = p.main
+		sbStroke.Color = p.cardStroke
 	end)
 
 	local TabButtons = Instance.new("Frame")
@@ -740,34 +764,20 @@ function library:AddWindow(title, options)
 	end
 
 	if opts.can_resize then
-		local resizing, resizeInput, resizeStart, startSize = false, nil, nil, nil
 		runtime:Connect(Resizer.InputBegan, function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-				if not resizing then
-					resizing = true
-					resizeInput = input
-					resizeStart = input.Position
-					startSize = Window.AbsoluteSize
-					setCameraLocked(true)
-				end
-			end
-		end)
-		runtime:Connect(UIS.InputChanged, function(input)
-			if resizing and (input == resizeInput or input.UserInputType == Enum.UserInputType.MouseMovement) then
-				local currentVp = getViewportSize()
-				local delta = input.Position - resizeStart
-				local newX = math.clamp(startSize.X + delta.X, opts.min_size.X, currentVp.X - 16)
-				local newY = math.clamp(startSize.Y + delta.Y, opts.min_size.Y, currentVp.Y - 60)
-				Window.Size = UDim2.new(0, newX, 0, newY)
-			end
-		end)
-		runtime:Connect(UIS.InputEnded, function(input)
-			if resizing and (input == resizeInput or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-				resizing = false
-				resizeInput = nil
-				setCameraLocked(false)
-				savedHeight = Window.Size.Y.Offset
-				saveWindowSize(winKey, Window.Size.X.Offset, Window.Size.Y.Offset)
+				local resizeStart = input.Position
+				local startSize = Window.AbsoluteSize
+				beginPointerDrag(input, function(pos)
+					local currentVp = getViewportSize()
+					local delta = pos - resizeStart
+					local newX = math.clamp(startSize.X + delta.X, opts.min_size.X, currentVp.X - 16)
+					local newY = math.clamp(startSize.Y + delta.Y, opts.min_size.Y, currentVp.Y - 60)
+					Window.Size = UDim2.new(0, newX, 0, newY)
+				end, function()
+					savedHeight = Window.Size.Y.Offset
+					saveWindowSize(winKey, Window.Size.X.Offset, Window.Size.Y.Offset)
+				end)
 			end
 		end)
 	end
@@ -786,24 +796,24 @@ function library:AddWindow(title, options)
 			Resizer.Visible = false
 			BarCover.Visible = false
 			barGlowLine.Visible = false
-			Tween(Window, {Size = UDim2.new(0, Window.AbsoluteSize.X, 0, MINIMIZED_HEIGHT)}, opts.tween_time)
+			Tween(Window, {Size = UDim2.new(0, Window.AbsoluteSize.X, 0, MINIMIZED_HEIGHT)})
 			ToggleBtn.Text = "❤️‍🔥"
+			isOpen = false
+			nativeTask.delay(opts.tween_time, function() canToggle = true end)
 		else
-			Tween(Window, {Size = UDim2.new(0, Window.AbsoluteSize.X, 0, savedHeight)}, opts.tween_time)
-			nativeTask.wait(opts.tween_time * 0.6)
-			BarCover.Visible = true
-			barGlowLine.Visible = true
-			if hasTabs then
-				TabSelection.Visible = true
-			end
-			TabsContainer.Visible = true
-			Resizer.Visible = opts.can_resize
-			ToggleBtn.Text = "📽️"
+			Tween(Window, {Size = UDim2.new(0, Window.AbsoluteSize.X, 0, savedHeight)})
+			nativeTask.delay(opts.tween_time * 0.6, function()
+				if not runtime.Alive then return end
+				BarCover.Visible = true
+				barGlowLine.Visible = true
+				if hasTabs then TabSelection.Visible = true end
+				TabsContainer.Visible = true
+				Resizer.Visible = opts.can_resize
+				ToggleBtn.Text = "📽️"
+			end)
+			isOpen = true
+			nativeTask.delay(opts.tween_time, function() canToggle = true end)
 		end
-
-		isOpen = not isOpen
-		nativeTask.wait(opts.tween_time)
-		canToggle = true
 	end)
 
 	local window_data = {}
@@ -859,7 +869,27 @@ function library:AddWindow(title, options)
 
 	local dropdown_open = false
 	local activeTabBtn = nil
+	local activeTabPage = nil
 	local tabStrokes = {}
+
+	local function styleTabBtn(btn, selected)
+		local st = tabStrokes[btn]
+		if selected then
+			btn.BackgroundColor3 = palette.activeTabBg
+			btn.TextColor3 = WHITE
+			if st then
+				st.Color = palette.activeStroke
+				st.Thickness = 1.9
+			end
+		else
+			btn.BackgroundColor3 = palette.cardBg
+			btn.TextColor3 = palette.tabTextOff
+			if st then
+				st.Color = palette.cardStroke
+				st.Thickness = 1.4
+			end
+		end
+	end
 
 	function window_data:AddTab(tab_name)
 		local tab_data = {}
@@ -872,23 +902,21 @@ function library:AddWindow(title, options)
 		end
 		if isOpen then TabSelection.Visible = true end
 
-		-- Pestaña estilo cápsula oscura con brillo morado al seleccionarse
 		local tabBtn = Instance.new("TextButton")
 		tabBtn.Name = "TabBtn_" .. tab_name
 		tabBtn.Parent = TabButtons
-		tabBtn.BackgroundColor3 = shiftColor(opts.bg_color, 0.045)
+		tabBtn.BackgroundColor3 = palette.cardBg
 		tabBtn.BorderSizePixel = 0
 		tabBtn.Font = Enum.Font.GothamBold
 		tabBtn.Text = "  " .. tab_name
-		tabBtn.TextColor3 = shiftColor(opts.text_color, -0.15)
+		tabBtn.TextColor3 = palette.tabTextOff
 		tabBtn.TextSize = 12
 		tabBtn.TextTruncate = Enum.TextTruncate.AtEnd
 		tabBtn.TextXAlignment = Enum.TextXAlignment.Left
 		tabBtn.AutoButtonColor = false
 		tabBtn.Size = UDim2.new(1, 0, 0, 30)
 		addCorner(tabBtn, 10)
-		local tStroke = addStroke(tabBtn, shiftColor(opts.bg_color, 0.13), 1.5, 0)
-		tabStrokes[tabBtn] = tStroke
+		tabStrokes[tabBtn] = addStroke(tabBtn, palette.cardStroke, 1.5, 0)
 
 		local tabPage = Instance.new("ScrollingFrame")
 		tabPage.Name = "Tab_" .. tab_name
@@ -899,30 +927,11 @@ function library:AddWindow(title, options)
 		tabPage.CanvasSize = UDim2.new(0, 0, 0, 0)
 		tabPage.AutomaticCanvasSize = Enum.AutomaticSize.Y
 		tabPage.ScrollBarThickness = 4
-		tabPage.ScrollBarImageColor3 = opts.main_color
+		tabPage.ScrollBarImageColor3 = palette.main
 		tabPage.Visible = false
 
-		local function styleTabBtn(btn, selected)
-			local st = tabStrokes[btn]
-			if selected then
-				btn.BackgroundColor3 = blendColor(opts.bg_color, opts.main_color, 0.24)
-				btn.TextColor3 = Color3.new(1, 1, 1)
-				if st then
-					st.Color = shiftColor(opts.main_color, 0.18)
-					st.Thickness = 1.9
-				end
-			else
-				btn.BackgroundColor3 = shiftColor(opts.bg_color, 0.045)
-				btn.TextColor3 = shiftColor(opts.text_color, -0.15)
-				if st then
-					st.Color = shiftColor(opts.bg_color, 0.13)
-					st.Thickness = 1.4
-				end
-			end
-		end
-
-		onThemeChange(function(c)
-			tabPage.ScrollBarImageColor3 = c.main_color
+		onThemeChange(function(p)
+			tabPage.ScrollBarImageColor3 = p.main
 			styleTabBtn(tabBtn, activeTabBtn == tabBtn)
 		end)
 
@@ -939,18 +948,12 @@ function library:AddWindow(title, options)
 		pageLayout.Padding = UDim.new(0, 6)
 
 		local function showTab()
-			if dropdown_open then return end
+			if dropdown_open or activeTabBtn == tabBtn then return end
+			if activeTabBtn then styleTabBtn(activeTabBtn, false) end
+			if activeTabPage then activeTabPage.Visible = false end
 			activeTabBtn = tabBtn
-			for _, child in ipairs(TabButtons:GetChildren()) do
-				if child:IsA("TextButton") then
-					styleTabBtn(child, child == tabBtn)
-				end
-			end
-			for _, page in ipairs(TabsContainer:GetChildren()) do
-				if page:IsA("ScrollingFrame") then
-					page.Visible = false
-				end
-			end
+			activeTabPage = tabPage
+			styleTabBtn(tabBtn, true)
 			tabPage.Visible = true
 		end
 
@@ -967,13 +970,13 @@ function library:AddWindow(title, options)
 			lbl.AutomaticSize = Enum.AutomaticSize.Y
 			lbl.Font = Enum.Font.GothamBold
 			lbl.Text = tostring(label_text or "Label")
-			lbl.TextColor3 = opts.text_color
+			lbl.TextColor3 = palette.text
 			lbl.TextSize = 13
 			lbl.TextWrapped = true
 			lbl.TextXAlignment = Enum.TextXAlignment.Left
 
-			onThemeChange(function(c)
-				lbl.TextColor3 = c.text_color
+			onThemeChange(function(p)
+				lbl.TextColor3 = p.text
 			end)
 
 			return lbl
@@ -986,33 +989,33 @@ function library:AddWindow(title, options)
 			local btn = Instance.new("TextButton")
 			btn.Name = "Button"
 			btn.Parent = tabPage
-			btn.BackgroundColor3 = opts.main_color
+			btn.BackgroundColor3 = palette.main
 			btn.BorderSizePixel = 0
 			btn.Size = UDim2.new(1, 0, 0, 32)
 			btn.Font = Enum.Font.GothamBold
 			btn.Text = tostring(button_text or "Button")
-			btn.TextColor3 = Color3.new(1, 1, 1)
+			btn.TextColor3 = WHITE
 			btn.TextSize = 13
 			btn.AutoButtonColor = false
 			addCorner(btn, 9)
-			local btnStroke = addStroke(btn, shiftColor(opts.main_color, 0.25), 1.6, 0.15)
+			local btnStroke = addStroke(btn, palette.btnStroke, 1.6, 0.15)
 
-			onThemeChange(function(c)
-				btn.BackgroundColor3 = c.main_color
-				btnStroke.Color = shiftColor(c.main_color, 0.25)
+			onThemeChange(function(p)
+				btn.BackgroundColor3 = p.main
+				btnStroke.Color = p.btnStroke
 			end)
 
 			runtime:Connect(btn.MouseEnter, function()
-				btn.BackgroundColor3 = shiftColor(opts.main_color, 0.08)
+				btn.BackgroundColor3 = palette.btnHover
 			end)
 			runtime:Connect(btn.MouseLeave, function()
-				btn.BackgroundColor3 = opts.main_color
+				btn.BackgroundColor3 = palette.main
 			end)
 			runtime:Connect(btn.MouseButton1Click, function()
-				btn.BackgroundColor3 = shiftColor(opts.main_color, 0.22)
+				btn.BackgroundColor3 = palette.btnPress
 				nativeTask.delay(0.08, function()
 					if btn and btn.Parent then
-						btn.BackgroundColor3 = opts.main_color
+						btn.BackgroundColor3 = palette.main
 					end
 				end)
 				pcall(callback)
@@ -1021,7 +1024,7 @@ function library:AddWindow(title, options)
 			return btn
 		end
 
-		-- ELEMENTO: SWITCH (Tarjeta oscura con brillo neón al activarse)
+		-- ELEMENTO: SWITCH
 		function tab_data:AddSwitch(switch_text, callback)
 			local switch_data = {}
 			callback = typeof(callback) == "function" and callback or function() end
@@ -1029,13 +1032,13 @@ function library:AddWindow(title, options)
 			local container = Instance.new("TextButton")
 			container.Name = "Switch"
 			container.Parent = tabPage
-			container.BackgroundColor3 = shiftColor(opts.bg_color, 0.04)
+			container.BackgroundColor3 = palette.cardBg
 			container.BorderSizePixel = 0
 			container.Size = UDim2.new(1, 0, 0, 34)
 			container.Text = ""
 			container.AutoButtonColor = false
 			addCorner(container, 10)
-			local swStroke = addStroke(container, shiftColor(opts.bg_color, 0.13), 1.6, 0)
+			local swStroke = addStroke(container, palette.cardStroke, 1.6, 0)
 
 			local titleLbl = Instance.new("TextLabel")
 			titleLbl.Name = "Title"
@@ -1045,7 +1048,7 @@ function library:AddWindow(title, options)
 			titleLbl.Size = UDim2.new(1, -64, 1, 0)
 			titleLbl.Font = Enum.Font.GothamBold
 			titleLbl.Text = tostring(switch_text or "Switch")
-			titleLbl.TextColor3 = opts.text_color
+			titleLbl.TextColor3 = palette.text
 			titleLbl.TextSize = 13
 			titleLbl.TextTruncate = Enum.TextTruncate.AtEnd
 			titleLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -1053,7 +1056,7 @@ function library:AddWindow(title, options)
 			local pill = Instance.new("Frame")
 			pill.Name = "Pill"
 			pill.Parent = container
-			pill.BackgroundColor3 = shiftColor(opts.bg_color, 0.12)
+			pill.BackgroundColor3 = palette.pillOff
 			pill.BorderSizePixel = 0
 			pill.Position = UDim2.new(1, -48, 0.5, -10)
 			pill.Size = UDim2.new(0, 38, 0, 20)
@@ -1071,27 +1074,27 @@ function library:AddWindow(title, options)
 
 			local toggled = false
 
-			local function syncSwitchTheme(c)
-				titleLbl.TextColor3 = c.text_color
+			local function syncSwitchTheme(p)
+				titleLbl.TextColor3 = p.text
 				if toggled then
-					container.BackgroundColor3 = blendColor(c.bg_color, c.main_color, 0.22)
-					swStroke.Color = shiftColor(c.main_color, 0.2)
-					pill.BackgroundColor3 = c.main_color
+					container.BackgroundColor3 = p.activeBg
+					swStroke.Color = p.activeStroke
+					pill.BackgroundColor3 = p.main
 				else
-					container.BackgroundColor3 = shiftColor(c.bg_color, 0.04)
-					swStroke.Color = shiftColor(c.bg_color, 0.13)
-					pill.BackgroundColor3 = shiftColor(c.bg_color, 0.12)
+					container.BackgroundColor3 = p.cardBg
+					swStroke.Color = p.cardStroke
+					pill.BackgroundColor3 = p.pillOff
 				end
 			end
 
 			onThemeChange(syncSwitchTheme)
 
 			local function updateVisual(state)
-				syncSwitchTheme(opts)
+				syncSwitchTheme(palette)
 				if state then
-					Tween(knob, {Position = UDim2.new(1, -17, 0.5, -7), BackgroundColor3 = Color3.new(1, 1, 1)}, 0.14)
+					Tween(knob, {Position = UDim2.new(1, -17, 0.5, -7), BackgroundColor3 = WHITE})
 				else
-					Tween(knob, {Position = UDim2.new(0, 3, 0.5, -7), BackgroundColor3 = Color3.fromRGB(235, 235, 240)}, 0.14)
+					Tween(knob, {Position = UDim2.new(0, 3, 0.5, -7), BackgroundColor3 = Color3.fromRGB(235, 235, 240)})
 				end
 			end
 
@@ -1118,7 +1121,7 @@ function library:AddWindow(title, options)
 			return switch_data, container
 		end
 
-		-- ELEMENTO: SLIDER (Barra oscura con selector cápsula blanco vertical)
+		-- ELEMENTO: SLIDER
 		function tab_data:AddSlider(slider_text, callback, slider_options)
 			local slider_data = {}
 			callback = typeof(callback) == "function" and callback or function() end
@@ -1130,11 +1133,11 @@ function library:AddWindow(title, options)
 			local container = Instance.new("Frame")
 			container.Name = "Slider"
 			container.Parent = tabPage
-			container.BackgroundColor3 = shiftColor(opts.bg_color, 0.04)
+			container.BackgroundColor3 = palette.cardBg
 			container.BorderSizePixel = 0
 			container.Size = UDim2.new(1, 0, 0, 44)
 			addCorner(container, 10)
-			local slStroke = addStroke(container, shiftColor(opts.bg_color, 0.13), 1.6, 0)
+			local slStroke = addStroke(container, palette.cardStroke, 1.6, 0)
 
 			local titleLbl = Instance.new("TextLabel")
 			titleLbl.Name = "Title"
@@ -1144,7 +1147,7 @@ function library:AddWindow(title, options)
 			titleLbl.Size = UDim2.new(1, -74, 0, 18)
 			titleLbl.Font = Enum.Font.GothamBold
 			titleLbl.Text = tostring(slider_text or "Slider")
-			titleLbl.TextColor3 = opts.text_color
+			titleLbl.TextColor3 = palette.text
 			titleLbl.TextSize = 13
 			titleLbl.TextTruncate = Enum.TextTruncate.AtEnd
 			titleLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -1157,7 +1160,7 @@ function library:AddWindow(title, options)
 			valLbl.Size = UDim2.new(0, 50, 0, 18)
 			valLbl.Font = Enum.Font.GothamBold
 			valLbl.Text = tostring(minVal)
-			valLbl.TextColor3 = shiftColor(opts.main_color, 0.3)
+			valLbl.TextColor3 = palette.valText
 			valLbl.TextSize = 13
 			valLbl.TextXAlignment = Enum.TextXAlignment.Right
 
@@ -1174,7 +1177,7 @@ function library:AddWindow(title, options)
 			local fill = Instance.new("Frame")
 			fill.Name = "Indicator"
 			fill.Parent = track
-			fill.BackgroundColor3 = opts.main_color
+			fill.BackgroundColor3 = palette.main
 			fill.BorderSizePixel = 0
 			fill.Size = UDim2.new(0, 0, 1, 0)
 			addCorner(fill, 4)
@@ -1182,37 +1185,40 @@ function library:AddWindow(title, options)
 			local thumb = Instance.new("Frame")
 			thumb.Name = "Thumb"
 			thumb.Parent = fill
-			thumb.BackgroundColor3 = Color3.new(1, 1, 1)
+			thumb.BackgroundColor3 = WHITE
 			thumb.BorderSizePixel = 0
 			thumb.Position = UDim2.new(1, -4, 0.5, -8)
 			thumb.Size = UDim2.new(0, 8, 0, 16)
 			addCorner(thumb, 4)
 			addStroke(thumb, Color3.fromRGB(12, 12, 16), 1.4, 0)
 
-			onThemeChange(function(c)
-				container.BackgroundColor3 = shiftColor(c.bg_color, 0.04)
-				slStroke.Color = shiftColor(c.bg_color, 0.13)
-				titleLbl.TextColor3 = c.text_color
-				valLbl.TextColor3 = shiftColor(c.main_color, 0.3)
-				fill.BackgroundColor3 = c.main_color
+			onThemeChange(function(p)
+				container.BackgroundColor3 = p.cardBg
+				slStroke.Color = p.cardStroke
+				titleLbl.TextColor3 = p.text
+				valLbl.TextColor3 = p.valText
+				fill.BackgroundColor3 = p.main
 			end)
 
 			local hitArea = Instance.new("TextButton")
 			hitArea.Name = "HitArea"
 			hitArea.Parent = container
 			hitArea.BackgroundTransparency = 1
-			hitArea.Position = UDim2.new(0, 8, 0, 20)
-			hitArea.Size = UDim2.new(1, -16, 0, 22)
+			hitArea.Position = UDim2.new(0, 6, 0, 18)
+			hitArea.Size = UDim2.new(1, -12, 0, 24)
 			hitArea.Text = ""
 
-			local sliding, slideInput = false, nil
+			local lastComputed = nil
 
 			local function applyRatio(ratio)
 				ratio = math.clamp(ratio, 0, 1)
 				fill.Size = UDim2.new(ratio, 0, 1, 0)
 				local computed = math.floor(((maxVal - minVal) * ratio) + minVal + 0.5)
-				valLbl.Text = tostring(computed)
-				pcall(callback, computed)
+				if computed ~= lastComputed then
+					lastComputed = computed
+					valLbl.Text = tostring(computed)
+					pcall(callback, computed)
+				end
 			end
 
 			local function updateFromInput(inputPos)
@@ -1223,34 +1229,19 @@ function library:AddWindow(title, options)
 			runtime:Connect(hitArea.InputBegan, function(input)
 				if readonly or dropdown_open then return end
 				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-					if not sliding then
-						sliding = true
-						slideInput = input
-						slStroke.Color = shiftColor(opts.main_color, 0.2)
-						setCameraLocked(true)
+					if beginPointerDrag(input, updateFromInput, function()
+						slStroke.Color = palette.cardStroke
+					end) then
+						slStroke.Color = palette.activeStroke
 						updateFromInput(input.Position)
 					end
-				end
-			end)
-
-			runtime:Connect(UIS.InputChanged, function(input)
-				if sliding and (input == slideInput or input.UserInputType == Enum.UserInputType.MouseMovement) then
-					updateFromInput(input.Position)
-				end
-			end)
-
-			runtime:Connect(UIS.InputEnded, function(input)
-				if sliding and (input == slideInput or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-					sliding = false
-					slideInput = nil
-					slStroke.Color = shiftColor(opts.bg_color, 0.13)
-					setCameraLocked(false)
 				end
 			end)
 
 			function slider_data:Set(new_value)
 				new_value = tonumber(new_value) or minVal
 				local ratio = (maxVal > minVal) and ((new_value - minVal) / (maxVal - minVal)) or 0
+				lastComputed = nil
 				applyRatio(ratio)
 			end
 
@@ -1266,32 +1257,32 @@ function library:AddWindow(title, options)
 			local box = Instance.new("TextBox")
 			box.Name = "TextBox"
 			box.Parent = tabPage
-			box.BackgroundColor3 = shiftColor(opts.bg_color, 0.04)
+			box.BackgroundColor3 = palette.cardBg
 			box.BorderSizePixel = 0
 			box.Size = UDim2.new(1, 0, 0, 32)
 			box.Font = Enum.Font.GothamBold
 			box.PlaceholderText = tostring(textbox_text or "Input Text")
-			box.PlaceholderColor3 = shiftColor(opts.text_color, -0.32)
+			box.PlaceholderColor3 = palette.placeholder
 			box.Text = ""
-			box.TextColor3 = opts.text_color
+			box.TextColor3 = palette.text
 			box.TextSize = 13
 			box.ClearTextOnFocus = false
 			addCorner(box, 10)
-			local boxStroke = addStroke(box, shiftColor(opts.bg_color, 0.13), 1.6, 0)
+			local boxStroke = addStroke(box, palette.cardStroke, 1.6, 0)
 
-			onThemeChange(function(c)
-				box.BackgroundColor3 = shiftColor(c.bg_color, 0.04)
-				box.PlaceholderColor3 = shiftColor(c.text_color, -0.32)
-				box.TextColor3 = c.text_color
-				boxStroke.Color = box:IsFocused() and shiftColor(c.main_color, 0.2) or shiftColor(c.bg_color, 0.13)
+			onThemeChange(function(p)
+				box.BackgroundColor3 = p.cardBg
+				box.PlaceholderColor3 = p.placeholder
+				box.TextColor3 = p.text
+				boxStroke.Color = box:IsFocused() and p.activeStroke or p.cardStroke
 			end)
 
 			runtime:Connect(box.Focused, function()
-				boxStroke.Color = shiftColor(opts.main_color, 0.2)
+				boxStroke.Color = palette.activeStroke
 			end)
 
 			runtime:Connect(box.FocusLost, function(enterPressed)
-				boxStroke.Color = shiftColor(opts.bg_color, 0.13)
+				boxStroke.Color = palette.cardStroke
 				if enterPressed and #box.Text > 0 then
 					pcall(callback, box.Text)
 					if clearOnEnter then box.Text = "" end
@@ -1311,12 +1302,12 @@ function library:AddWindow(title, options)
 			local wrapper = Instance.new("Frame")
 			wrapper.Name = "Dropdown"
 			wrapper.Parent = tabPage
-			wrapper.BackgroundColor3 = shiftColor(opts.bg_color, 0.04)
+			wrapper.BackgroundColor3 = palette.cardBg
 			wrapper.BorderSizePixel = 0
 			wrapper.ClipsDescendants = true
 			wrapper.Size = UDim2.new(1, 0, 0, 32)
 			addCorner(wrapper, 10)
-			local ddStroke = addStroke(wrapper, shiftColor(opts.bg_color, 0.13), 1.6, 0)
+			local ddStroke = addStroke(wrapper, palette.cardStroke, 1.6, 0)
 
 			local headerBtn = Instance.new("TextButton")
 			headerBtn.Name = "Header"
@@ -1325,7 +1316,7 @@ function library:AddWindow(title, options)
 			headerBtn.Size = UDim2.new(1, 0, 0, 32)
 			headerBtn.Font = Enum.Font.GothamBold
 			headerBtn.Text = "   " .. dropdown_name
-			headerBtn.TextColor3 = opts.text_color
+			headerBtn.TextColor3 = palette.text
 			headerBtn.TextSize = 13
 			headerBtn.TextTruncate = Enum.TextTruncate.AtEnd
 			headerBtn.TextXAlignment = Enum.TextXAlignment.Left
@@ -1338,7 +1329,7 @@ function library:AddWindow(title, options)
 			arrow.Size = UDim2.new(0, 20, 1, 0)
 			arrow.Font = Enum.Font.GothamBold
 			arrow.Text = "▼"
-			arrow.TextColor3 = shiftColor(opts.main_color, 0.25)
+			arrow.TextColor3 = palette.valText
 			arrow.TextSize = 11
 
 			local listFrame = Instance.new("ScrollingFrame")
@@ -1351,20 +1342,20 @@ function library:AddWindow(title, options)
 			listFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 			listFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 			listFrame.ScrollBarThickness = 2
-			listFrame.ScrollBarImageColor3 = opts.main_color
+			listFrame.ScrollBarImageColor3 = palette.main
 
 			local isExpanded = false
 
-			onThemeChange(function(c)
-				wrapper.BackgroundColor3 = shiftColor(c.bg_color, 0.04)
-				ddStroke.Color = isExpanded and shiftColor(c.main_color, 0.2) or shiftColor(c.bg_color, 0.13)
-				headerBtn.TextColor3 = c.text_color
-				arrow.TextColor3 = shiftColor(c.main_color, 0.25)
-				listFrame.ScrollBarImageColor3 = c.main_color
+			onThemeChange(function(p)
+				wrapper.BackgroundColor3 = p.cardBg
+				ddStroke.Color = isExpanded and p.activeStroke or p.cardStroke
+				headerBtn.TextColor3 = p.text
+				arrow.TextColor3 = p.valText
+				listFrame.ScrollBarImageColor3 = p.main
 				for _, itemBtn in pairs(itemsMap) do
 					if itemBtn and itemBtn.Parent then
-						itemBtn.BackgroundColor3 = shiftColor(c.bg_color, 0.07)
-						itemBtn.TextColor3 = c.text_color
+						itemBtn.BackgroundColor3 = p.itemBg
+						itemBtn.TextColor3 = p.text
 					end
 				end
 			end)
@@ -1376,19 +1367,17 @@ function library:AddWindow(title, options)
 
 			local function refreshHeight()
 				local count = 0
-				for _, child in ipairs(listFrame:GetChildren()) do
-					if child:IsA("TextButton") then count = count + 1 end
-				end
+				for _ in pairs(itemsMap) do count = count + 1 end
 				local targetListH = math.min(count * 28, 130)
 				listFrame.Size = UDim2.new(1, -12, 0, targetListH)
-				ddStroke.Color = isExpanded and shiftColor(opts.main_color, 0.2) or shiftColor(opts.bg_color, 0.13)
-				Tween(wrapper, {Size = UDim2.new(1, 0, 0, isExpanded and (38 + targetListH) or 32)}, 0.14)
+				ddStroke.Color = isExpanded and palette.activeStroke or palette.cardStroke
+				Tween(wrapper, {Size = UDim2.new(1, 0, 0, isExpanded and (38 + targetListH) or 32)})
 			end
 
 			runtime:Connect(headerBtn.MouseButton1Click, function()
 				isExpanded = not isExpanded
 				dropdown_open = isExpanded
-				Tween(arrow, {Rotation = isExpanded and 180 or 0}, 0.14)
+				Tween(arrow, {Rotation = isExpanded and 180 or 0})
 				refreshHeight()
 			end)
 
@@ -1401,12 +1390,12 @@ function library:AddWindow(title, options)
 				local itemBtn = Instance.new("TextButton")
 				itemBtn.Name = itemName
 				itemBtn.Parent = listFrame
-				itemBtn.BackgroundColor3 = shiftColor(opts.bg_color, 0.07)
+				itemBtn.BackgroundColor3 = palette.itemBg
 				itemBtn.BorderSizePixel = 0
 				itemBtn.Size = UDim2.new(1, 0, 0, 24)
 				itemBtn.Font = Enum.Font.GothamBold
 				itemBtn.Text = "  " .. itemName
-				itemBtn.TextColor3 = opts.text_color
+				itemBtn.TextColor3 = palette.text
 				itemBtn.TextSize = 12
 				itemBtn.TextXAlignment = Enum.TextXAlignment.Left
 				itemBtn.AutoButtonColor = false
@@ -1415,16 +1404,16 @@ function library:AddWindow(title, options)
 				itemsMap[itemName] = itemBtn
 
 				runtime:Connect(itemBtn.MouseEnter, function()
-					itemBtn.BackgroundColor3 = opts.main_color
+					itemBtn.BackgroundColor3 = palette.main
 				end)
 				runtime:Connect(itemBtn.MouseLeave, function()
-					itemBtn.BackgroundColor3 = shiftColor(opts.bg_color, 0.07)
+					itemBtn.BackgroundColor3 = palette.itemBg
 				end)
 				runtime:Connect(itemBtn.MouseButton1Click, function()
 					headerBtn.Text = "   [ " .. itemName .. " ]"
 					isExpanded = false
 					dropdown_open = false
-					Tween(arrow, {Rotation = 0}, 0.14)
+					Tween(arrow, {Rotation = 0})
 					refreshHeight()
 					pcall(callback, itemName)
 				end)
@@ -1471,12 +1460,12 @@ function library:AddWindow(title, options)
 			local wrapper = Instance.new("Frame")
 			wrapper.Name = "ColorPicker"
 			wrapper.Parent = tabPage
-			wrapper.BackgroundColor3 = shiftColor(opts.bg_color, 0.04)
+			wrapper.BackgroundColor3 = palette.cardBg
 			wrapper.BorderSizePixel = 0
 			wrapper.ClipsDescendants = true
 			wrapper.Size = UDim2.new(1, 0, 0, 34)
 			addCorner(wrapper, 10)
-			local cpStroke = addStroke(wrapper, shiftColor(opts.bg_color, 0.13), 1.6, 0)
+			local cpStroke = addStroke(wrapper, palette.cardStroke, 1.6, 0)
 
 			local headerBtn = Instance.new("TextButton")
 			headerBtn.Name = "Header"
@@ -1493,7 +1482,7 @@ function library:AddWindow(title, options)
 			titleLbl.Size = UDim2.new(1, -58, 1, 0)
 			titleLbl.Font = Enum.Font.GothamBold
 			titleLbl.Text = picker_text
-			titleLbl.TextColor3 = opts.text_color
+			titleLbl.TextColor3 = palette.text
 			titleLbl.TextSize = 13
 			titleLbl.TextTruncate = Enum.TextTruncate.AtEnd
 			titleLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -1510,10 +1499,10 @@ function library:AddWindow(title, options)
 
 			local expanded = false
 
-			onThemeChange(function(c)
-				wrapper.BackgroundColor3 = shiftColor(c.bg_color, 0.04)
-				cpStroke.Color = expanded and shiftColor(c.main_color, 0.2) or shiftColor(c.bg_color, 0.13)
-				titleLbl.TextColor3 = c.text_color
+			onThemeChange(function(p)
+				wrapper.BackgroundColor3 = p.cardBg
+				cpStroke.Color = expanded and p.activeStroke or p.cardStroke
+				titleLbl.TextColor3 = p.text
 			end)
 
 			local panel = Instance.new("Frame")
@@ -1550,8 +1539,8 @@ function library:AddWindow(title, options)
 			local function applyColor(col, triggerCallback)
 				currentColor = col
 				previewBox.BackgroundColor3 = col
-				for _, upd in ipairs(rgbUpdaters) do
-					upd(col)
+				for i = 1, #rgbUpdaters do
+					rgbUpdaters[i](col)
 				end
 				if triggerCallback then
 					pcall(callback, col)
@@ -1607,12 +1596,12 @@ function library:AddWindow(title, options)
 				numLbl.Size = UDim2.new(0, 28, 1, 0)
 				numLbl.Font = Enum.Font.GothamBold
 				numLbl.Text = "0"
-				numLbl.TextColor3 = opts.text_color
+				numLbl.TextColor3 = palette.text
 				numLbl.TextSize = 11
 				numLbl.TextXAlignment = Enum.TextXAlignment.Right
 
-				onThemeChange(function(c)
-					numLbl.TextColor3 = c.text_color
+				onThemeChange(function(p)
+					numLbl.TextColor3 = p.text
 				end)
 
 				local barTrack = Instance.new("Frame")
@@ -1633,8 +1622,8 @@ function library:AddWindow(title, options)
 				local hit = Instance.new("TextButton")
 				hit.Parent = row
 				hit.BackgroundTransparency = 1
-				hit.Position = UDim2.new(0, 16, 0, 0)
-				hit.Size = UDim2.new(1, -44, 1, 0)
+				hit.Position = UDim2.new(0, 16, 0, -2)
+				hit.Size = UDim2.new(1, -44, 1, 4)
 				hit.Text = ""
 
 				local function syncChannelVisual(col)
@@ -1648,42 +1637,28 @@ function library:AddWindow(title, options)
 				table.insert(rgbUpdaters, syncChannelVisual)
 				syncChannelVisual(currentColor)
 
-				local draggingCh, dragChInput = false, nil
 				local function updateCh(pos)
 					local ratio = math.clamp((pos.X - barTrack.AbsolutePosition.X) / math.max(1, barTrack.AbsoluteSize.X), 0, 1)
 					local intV = math.floor(ratio * 255 + 0.5)
+					local prevV = (idx == 1 and rVal) or (idx == 2 and gVal) or bVal
+					if intV == prevV then return end
 					if idx == 1 then rVal = intV elseif idx == 2 then gVal = intV else bVal = intV end
 					applyColor(Color3.fromRGB(rVal, gVal, bVal), true)
 				end
 
 				runtime:Connect(hit.InputBegan, function(input)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-						if not draggingCh then
-							draggingCh = true
-							dragChInput = input
-							setCameraLocked(true)
+						if beginPointerDrag(input, updateCh) then
 							updateCh(input.Position)
 						end
-					end
-				end)
-				runtime:Connect(UIS.InputChanged, function(input)
-					if draggingCh and (input == dragChInput or input.UserInputType == Enum.UserInputType.MouseMovement) then
-						updateCh(input.Position)
-					end
-				end)
-				runtime:Connect(UIS.InputEnded, function(input)
-					if draggingCh and (input == dragChInput or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-						draggingCh = false
-						dragChInput = nil
-						setCameraLocked(false)
 					end
 				end)
 			end
 
 			runtime:Connect(headerBtn.MouseButton1Click, function()
 				expanded = not expanded
-				cpStroke.Color = expanded and shiftColor(opts.main_color, 0.2) or shiftColor(opts.bg_color, 0.13)
-				Tween(wrapper, {Size = UDim2.new(1, 0, 0, expanded and 148 or 34)}, 0.14)
+				cpStroke.Color = expanded and palette.activeStroke or palette.cardStroke
+				Tween(wrapper, {Size = UDim2.new(1, 0, 0, expanded and 148 or 34)})
 			end)
 
 			function picker_data:Set(col)
@@ -1703,30 +1678,30 @@ function library:AddWindow(title, options)
 			local folderBox = Instance.new("Frame")
 			folderBox.Name = "Folder"
 			folderBox.Parent = tabPage
-			folderBox.BackgroundColor3 = shiftColor(opts.bg_color, 0.025)
+			folderBox.BackgroundColor3 = palette.sidebarBg
 			folderBox.BorderSizePixel = 0
 			folderBox.ClipsDescendants = true
 			folderBox.Size = UDim2.new(1, 0, 0, 32)
 			addCorner(folderBox, 10)
-			local fldStroke = addStroke(folderBox, shiftColor(opts.main_color, 0.18), 1.5, 0.25)
+			local fldStroke = addStroke(folderBox, palette.activeStroke, 1.5, 0.25)
 
 			local folderBtn = Instance.new("TextButton")
 			folderBtn.Name = "Header"
 			folderBtn.Parent = folderBox
-			folderBtn.BackgroundColor3 = blendColor(opts.bg_color, opts.main_color, 0.45)
+			folderBtn.BackgroundColor3 = palette.folderHeader
 			folderBtn.BorderSizePixel = 0
 			folderBtn.Size = UDim2.new(1, 0, 0, 32)
 			folderBtn.Font = Enum.Font.GothamBold
 			folderBtn.Text = "  ▸  " .. folder_name
-			folderBtn.TextColor3 = Color3.new(1, 1, 1)
+			folderBtn.TextColor3 = WHITE
 			folderBtn.TextSize = 13
 			folderBtn.TextXAlignment = Enum.TextXAlignment.Left
 			addCorner(folderBtn, 9)
 
-			onThemeChange(function(c)
-				folderBox.BackgroundColor3 = shiftColor(c.bg_color, 0.025)
-				fldStroke.Color = shiftColor(c.main_color, 0.18)
-				folderBtn.BackgroundColor3 = blendColor(c.bg_color, c.main_color, 0.45)
+			onThemeChange(function(p)
+				folderBox.BackgroundColor3 = p.sidebarBg
+				fldStroke.Color = p.activeStroke
+				folderBtn.BackgroundColor3 = p.folderHeader
 			end)
 
 			local content = Instance.new("Frame")
@@ -1752,7 +1727,11 @@ function library:AddWindow(title, options)
 				end
 			end
 
-			runtime:Connect(contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"), syncFolderSize)
+			runtime:Connect(contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"), function()
+				if folderOpen then
+					syncFolderSize()
+				end
+			end)
 
 			runtime:Connect(folderBtn.MouseButton1Click, function()
 				folderOpen = not folderOpen
@@ -1768,7 +1747,6 @@ function library:AddWindow(title, options)
 						if obj and typeof(obj) == "Instance" then
 							obj.Parent = content
 						end
-						syncFolderSize()
 						return table.unpack(ret)
 					end
 				end
