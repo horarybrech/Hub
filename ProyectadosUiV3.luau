@@ -62,7 +62,7 @@ end
 
 local ui_options = {
 	main_color = Color3.fromRGB(110, 50, 160),
-	min_size = Vector2.new(420, 310),
+	min_size = Vector2.new(440, 310),
 	toggle_key = Enum.KeyCode.RightShift,
 	can_resize = true,
 }
@@ -154,16 +154,16 @@ local function getResponsiveDimensions(requestedSize)
 	local vp = getViewportSize()
 	local compact = isCompactDevice()
 
-	local maxAllowedW = math.max(240, vp.X - (compact and 28 or 40))
+	local maxAllowedW = math.max(260, vp.X - (compact and 28 or 40))
 	local maxAllowedH = math.max(190, vp.Y - (compact and 84 or 90))
 
-	local targetW = compact and math.min(requestedSize.X, math.floor(vp.X * 0.86)) or requestedSize.X
+	local targetW = compact and math.min(requestedSize.X, math.floor(vp.X * 0.88)) or requestedSize.X
 	local targetH = compact and math.min(requestedSize.Y, math.floor(vp.Y * 0.72)) or requestedSize.Y
 
-	local finalW = math.clamp(targetW, 240, maxAllowedW)
+	local finalW = math.clamp(targetW, 260, maxAllowedW)
 	local finalH = math.clamp(targetH, 190, maxAllowedH)
 
-	local hardMinW = math.min(compact and 250 or 320, maxAllowedW)
+	local hardMinW = math.min(compact and 270 or 340, maxAllowedW)
 	local hardMinH = math.min(compact and 195 or 240, maxAllowedH)
 
 	return Vector2.new(finalW, finalH), Vector2.new(hardMinW, hardMinH), vp
@@ -394,7 +394,7 @@ function library:AddWindow(title, options)
 	local startX = math.max(12, math.floor((vp.X - initialSize.X) / 2) + ((windows - 1) * 18))
 	local startY = math.clamp(60 + ((windows - 1) * 18), 54, math.max(54, vp.Y - initialSize.Y - 12))
 
-	-- Ventana Principal (Active = true bloquea el paso de toques hacia la cámara)
+	-- Ventana Principal
 	local Window = Instance.new("Frame")
 	Window.Name = "Window_" .. windows
 	Window.Parent = windowsFrame
@@ -407,7 +407,6 @@ function library:AddWindow(title, options)
 	addCorner(Window, 8)
 	addStroke(Window, opts.main_color, 1.3, 0.2)
 
-	-- Habilitar arrastre en TODA la ventana
 	makeDraggable(Window, Window)
 
 	-- Barra Superior
@@ -464,17 +463,20 @@ function library:AddWindow(title, options)
 	TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 	TitleLabel.ZIndex = 3
 
-	-- Barra de Pestañas (Tabs)
+	-- Panel Lateral Izquierdo de Pestañas (Vertical de arriba hacia abajo)
+	local sidebarW = isCompactDevice() and 96 or 115
+
 	local TabSelection = Instance.new("ScrollingFrame")
 	TabSelection.Name = "TabSelection"
 	TabSelection.Parent = Window
 	TabSelection.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
 	TabSelection.BorderSizePixel = 0
-	TabSelection.Position = UDim2.new(0, 10, 0, 36)
-	TabSelection.Size = UDim2.new(1, -20, 0, 28)
+	TabSelection.Position = UDim2.new(0, 8, 0, 36)
+	TabSelection.Size = UDim2.new(0, sidebarW, 1, -44)
 	TabSelection.CanvasSize = UDim2.new(0, 0, 0, 0)
-	TabSelection.AutomaticCanvasSize = Enum.AutomaticSize.X
-	TabSelection.ScrollBarThickness = 0
+	TabSelection.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	TabSelection.ScrollBarThickness = 2
+	TabSelection.ScrollBarImageColor3 = opts.main_color
 	TabSelection.Visible = false
 	addCorner(TabSelection, 6)
 	addStroke(TabSelection, Color3.fromRGB(45, 45, 55), 1, 0.3)
@@ -483,22 +485,23 @@ function library:AddWindow(title, options)
 	TabButtons.Name = "TabButtons"
 	TabButtons.Parent = TabSelection
 	TabButtons.BackgroundTransparency = 1
-	TabButtons.Position = UDim2.new(0, 4, 0, 3)
-	TabButtons.Size = UDim2.new(1, -8, 1, -6)
+	TabButtons.Position = UDim2.new(0, 4, 0, 4)
+	TabButtons.Size = UDim2.new(1, -8, 0, 0)
+	TabButtons.AutomaticSize = Enum.AutomaticSize.Y
 
 	local tabListLayout = Instance.new("UIListLayout")
 	tabListLayout.Parent = TabButtons
-	tabListLayout.FillDirection = Enum.FillDirection.Horizontal
+	tabListLayout.FillDirection = Enum.FillDirection.Vertical
 	tabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	tabListLayout.Padding = UDim.new(0, 5)
+	tabListLayout.Padding = UDim.new(0, 4)
 
-	-- Contenedor de Pestañas
+	-- Contenedor Principal de Pestañas (A la derecha del panel lateral)
 	local TabsContainer = Instance.new("Frame")
 	TabsContainer.Name = "Tabs"
 	TabsContainer.Parent = Window
 	TabsContainer.BackgroundTransparency = 1
-	TabsContainer.Position = UDim2.new(0, 10, 0, 70)
-	TabsContainer.Size = UDim2.new(1, -20, 1, -80)
+	TabsContainer.Position = UDim2.new(0, 10, 0, 36)
+	TabsContainer.Size = UDim2.new(1, -20, 1, -44)
 
 	-- Redimensionador (Esquina inferior derecha)
 	local Resizer = Instance.new("TextButton")
@@ -515,6 +518,7 @@ function library:AddWindow(title, options)
 
 	local isOpen = true
 	local savedHeight = initialSize.Y
+	local hasTabs = false
 
 	-- Reajuste automático si cambia la resolución o se gira la pantalla
 	local function clampToViewport()
@@ -522,7 +526,14 @@ function library:AddWindow(title, options)
 		local _, newHardMin, currentVp = getResponsiveDimensions(requestedSize)
 		opts.min_size = newHardMin
 
-		local maxW = math.max(240, currentVp.X - 20)
+		sidebarW = isCompactDevice() and 96 or 115
+		TabSelection.Size = UDim2.new(0, sidebarW, 1, -44)
+		if hasTabs then
+			TabsContainer.Position = UDim2.new(0, sidebarW + 14, 0, 36)
+			TabsContainer.Size = UDim2.new(1, -(sidebarW + 22), 1, -44)
+		end
+
+		local maxW = math.max(260, currentVp.X - 20)
 		local maxH = math.max(190, currentVp.Y - 70)
 
 		local curW = math.min(Window.Size.X.Offset, maxW)
@@ -605,7 +616,7 @@ function library:AddWindow(title, options)
 			Tween(Window, {Size = UDim2.new(0, Window.AbsoluteSize.X, 0, savedHeight)}, opts.tween_time)
 			nativeTask.wait(opts.tween_time * 0.6)
 			BarCover.Visible = true
-			if #TabButtons:GetChildren() > 1 then
+			if hasTabs then
 				TabSelection.Visible = true
 			end
 			TabsContainer.Visible = true
@@ -633,6 +644,12 @@ function library:AddWindow(title, options)
 	function window_data:AddTab(tab_name)
 		local tab_data = {}
 		tab_name = tostring(tab_name or "New Tab")
+
+		if not hasTabs then
+			hasTabs = true
+			TabsContainer.Position = UDim2.new(0, sidebarW + 14, 0, 36)
+			TabsContainer.Size = UDim2.new(1, -(sidebarW + 22), 1, -44)
+		end
 		if isOpen then TabSelection.Visible = true end
 
 		local tabBtn = Instance.new("TextButton")
@@ -643,10 +660,17 @@ function library:AddWindow(title, options)
 		tabBtn.Font = Enum.Font.GothamSemibold
 		tabBtn.Text = tab_name
 		tabBtn.TextColor3 = Color3.fromRGB(185, 185, 195)
-		tabBtn.TextSize = 13
+		tabBtn.TextSize = 12
+		tabBtn.TextTruncate = Enum.TextTruncate.AtEnd
+		tabBtn.TextXAlignment = Enum.TextXAlignment.Left
 		tabBtn.AutoButtonColor = false
-		tabBtn.Size = UDim2.new(0, math.max(64, tabBtn.TextBounds.X + 18), 1, 0)
+		tabBtn.Size = UDim2.new(1, 0, 0, 28)
 		addCorner(tabBtn, 5)
+
+		local tabBtnPad = Instance.new("UIPadding")
+		tabBtnPad.PaddingLeft = UDim.new(0, 8)
+		tabBtnPad.PaddingRight = UDim.new(0, 6)
+		tabBtnPad.Parent = tabBtn
 
 		local tabPage = Instance.new("ScrollingFrame")
 		tabPage.Name = "Tab_" .. tab_name
