@@ -625,6 +625,7 @@ function library:AddWindow(title, options)
 	local titleFontObjs = {}
 	local bodyFontObjs = {}
 	local cardCornerObjs = {}
+	local syncLayoutAfterTheme = nil
 
 	local function registerTitleFont(obj)
 		obj.Font = palette.fontTitle
@@ -663,6 +664,9 @@ function library:AddWindow(title, options)
 		end
 		for i = 1, #themeCallbacks do
 			pcall(themeCallbacks[i], palette)
+		end
+		if syncLayoutAfterTheme then
+			pcall(syncLayoutAfterTheme)
 		end
 	end
 
@@ -789,6 +793,7 @@ function library:AddWindow(title, options)
 	local TabSelection = Instance.new("ScrollingFrame")
 	TabSelection.Name = "TabSelection"
 	TabSelection.Parent = InnerFrame
+	TabSelection.Active = true
 	TabSelection.BackgroundColor3 = palette.sidebarBg
 	TabSelection.BorderSizePixel = 0
 	TabSelection.Position = UDim2.new(0, 8, 0, 42)
@@ -797,6 +802,7 @@ function library:AddWindow(title, options)
 	TabSelection.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	TabSelection.ScrollBarThickness = 3
 	TabSelection.ScrollBarImageColor3 = palette.main
+	TabSelection.ZIndex = 3
 	TabSelection.Visible = false
 	registerCardCorner(addCorner(TabSelection, palette.cornerCard))
 	local sbStroke = addStroke(TabSelection, palette.cardStroke, 1.5, 0)
@@ -814,6 +820,7 @@ function library:AddWindow(title, options)
 	TabButtons.Position = UDim2.new(0, 6, 0, 6)
 	TabButtons.Size = UDim2.new(1, -12, 0, 0)
 	TabButtons.AutomaticSize = Enum.AutomaticSize.Y
+	TabButtons.ZIndex = 4
 
 	local tabListLayout = Instance.new("UIListLayout")
 	tabListLayout.Parent = TabButtons
@@ -828,6 +835,7 @@ function library:AddWindow(title, options)
 	TabsContainer.BackgroundTransparency = 1
 	TabsContainer.Position = UDim2.new(0, 10, 0, 42)
 	TabsContainer.Size = UDim2.new(1, -20, 1, -50)
+	TabsContainer.ZIndex = 3
 
 	-- Redimensionador
 	local Resizer = Instance.new("TextButton")
@@ -844,6 +852,34 @@ function library:AddWindow(title, options)
 
 	local savedHeight = initialSize.Y
 	local hasTabs = false
+	local activeTabBtn = nil
+	local activeTabPage = nil
+	local tabStrokes = {}
+	local dropdown_open = false
+
+	local function applyTabLayoutGeometry()
+		sidebarW = isCompactDevice() and 96 or 114
+		TabSelection.Size = UDim2.new(0, sidebarW, 1, -50)
+		TabSelection.Position = UDim2.new(0, 8, 0, 42)
+		if hasTabs then
+			TabsContainer.Position = UDim2.new(0, sidebarW + 14, 0, 42)
+			TabsContainer.Size = UDim2.new(1, -(sidebarW + 22), 1, -50)
+		else
+			TabsContainer.Position = UDim2.new(0, 10, 0, 42)
+			TabsContainer.Size = UDim2.new(1, -20, 1, -50)
+		end
+		if isOpen then
+			InnerFrame.Visible = true
+			TabsContainer.Visible = true
+			if hasTabs then
+				TabSelection.Visible = true
+			end
+			if activeTabPage then
+				activeTabPage.Visible = true
+				activeTabPage.CanvasPosition = Vector2.new(0, activeTabPage.CanvasPosition.Y)
+			end
+		end
+	end
 
 	local function clampToViewport()
 		if not Window or not Window.Parent then return end
@@ -851,12 +887,7 @@ function library:AddWindow(title, options)
 		local _, newHardMin, currentVp = getResponsiveDimensions(currentReq, true)
 		opts.min_size = newHardMin
 
-		sidebarW = isCompactDevice() and 96 or 114
-		TabSelection.Size = UDim2.new(0, sidebarW, 1, -50)
-		if hasTabs then
-			TabsContainer.Position = UDim2.new(0, sidebarW + 14, 0, 42)
-			TabsContainer.Size = UDim2.new(1, -(sidebarW + 22), 1, -50)
-		end
+		applyTabLayoutGeometry()
 
 		local maxW = math.max(260, currentVp.X - 20)
 		local maxH = math.max(190, currentVp.Y - 70)
@@ -874,6 +905,11 @@ function library:AddWindow(title, options)
 		local clampedX = math.clamp(Window.Position.X.Offset, 6, math.max(6, currentVp.X - curW - 6))
 		local clampedY = math.clamp(Window.Position.Y.Offset, 6, math.max(6, currentVp.Y - Window.Size.Y.Offset - 6))
 		Window.Position = UDim2.new(0, clampedX, 0, clampedY)
+	end
+
+	syncLayoutAfterTheme = function()
+		dropdown_open = false
+		clampToViewport()
 	end
 
 	do
@@ -902,9 +938,11 @@ function library:AddWindow(title, options)
 					local newX = math.clamp(startSize.X + delta.X, opts.min_size.X, currentVp.X - 16)
 					local newY = math.clamp(startSize.Y + delta.Y, opts.min_size.Y, currentVp.Y - 60)
 					Window.Size = UDim2.new(0, newX, 0, newY)
+					applyTabLayoutGeometry()
 				end, function()
 					savedHeight = Window.Size.Y.Offset
 					saveWindowSize(winKey, Window.Size.X.Offset, Window.Size.Y.Offset)
+					clampToViewport()
 				end)
 			end
 		end)
@@ -938,6 +976,7 @@ function library:AddWindow(title, options)
 				TabsContainer.Visible = true
 				Resizer.Visible = opts.can_resize
 				ToggleBtn.Text = palette.openIcon
+				applyTabLayoutGeometry()
 			end)
 			isOpen = true
 			nativeTask.delay(opts.tween_time, function() canToggle = true end)
@@ -975,11 +1014,6 @@ function library:AddWindow(title, options)
 	end
 	window_data.ResetColors = window_data.ResetTheme
 
-	local dropdown_open = false
-	local activeTabBtn = nil
-	local activeTabPage = nil
-	local tabStrokes = {}
-
 	local function styleTabBtn(btn, selected)
 		local st = tabStrokes[btn]
 		if selected then
@@ -1005,14 +1039,14 @@ function library:AddWindow(title, options)
 
 		if not hasTabs then
 			hasTabs = true
-			TabsContainer.Position = UDim2.new(0, sidebarW + 14, 0, 42)
-			TabsContainer.Size = UDim2.new(1, -(sidebarW + 22), 1, -50)
+			applyTabLayoutGeometry()
 		end
 		if isOpen then TabSelection.Visible = true end
 
 		local tabBtn = Instance.new("TextButton")
 		tabBtn.Name = "TabBtn_" .. tab_name
 		tabBtn.Parent = TabButtons
+		tabBtn.Active = true
 		tabBtn.BackgroundColor3 = palette.cardBg
 		tabBtn.BorderSizePixel = 0
 		tabBtn.Text = "  " .. tab_name
@@ -1021,6 +1055,7 @@ function library:AddWindow(title, options)
 		tabBtn.TextTruncate = Enum.TextTruncate.AtEnd
 		tabBtn.TextXAlignment = Enum.TextXAlignment.Left
 		tabBtn.AutoButtonColor = false
+		tabBtn.ZIndex = 5
 		tabBtn.Size = UDim2.new(1, 0, 0, 30)
 		registerBodyFont(tabBtn)
 		registerCardCorner(addCorner(tabBtn, palette.cornerCard))
@@ -1029,6 +1064,7 @@ function library:AddWindow(title, options)
 		local tabPage = Instance.new("ScrollingFrame")
 		tabPage.Name = "Tab_" .. tab_name
 		tabPage.Parent = TabsContainer
+		tabPage.Active = true
 		tabPage.BackgroundTransparency = 1
 		tabPage.BorderSizePixel = 0
 		tabPage.Size = UDim2.new(1, 0, 1, 0)
@@ -1036,6 +1072,7 @@ function library:AddWindow(title, options)
 		tabPage.AutomaticCanvasSize = Enum.AutomaticSize.Y
 		tabPage.ScrollBarThickness = 4
 		tabPage.ScrollBarImageColor3 = palette.main
+		tabPage.ZIndex = 4
 		tabPage.Visible = false
 
 		onThemeChange(function(p)
@@ -1056,13 +1093,13 @@ function library:AddWindow(title, options)
 		pageLayout.Padding = UDim.new(0, 6)
 
 		local function showTab()
-			if activeTabBtn == tabBtn then return end
-			if activeTabBtn then styleTabBtn(activeTabBtn, false) end
 			if activeTabPage then activeTabPage.Visible = false end
+			if activeTabBtn then styleTabBtn(activeTabBtn, false) end
 			activeTabBtn = tabBtn
 			activeTabPage = tabPage
 			styleTabBtn(tabBtn, true)
 			tabPage.Visible = true
+			applyTabLayoutGeometry()
 		end
 
 		runtime:Connect(tabBtn.MouseButton1Click, showTab)
@@ -1081,6 +1118,7 @@ function library:AddWindow(title, options)
 			lbl.TextSize = 13
 			lbl.TextWrapped = true
 			lbl.TextXAlignment = Enum.TextXAlignment.Left
+			lbl.ZIndex = 5
 			registerTitleFont(lbl)
 
 			onThemeChange(function(p)
@@ -1097,6 +1135,7 @@ function library:AddWindow(title, options)
 			local btn = Instance.new("TextButton")
 			btn.Name = "Button"
 			btn.Parent = tabPage
+			btn.Active = true
 			btn.BackgroundColor3 = palette.main
 			btn.BorderSizePixel = 0
 			btn.Size = UDim2.new(1, 0, 0, 32)
@@ -1104,6 +1143,7 @@ function library:AddWindow(title, options)
 			btn.TextColor3 = WHITE
 			btn.TextSize = 13
 			btn.AutoButtonColor = false
+			btn.ZIndex = 6
 			registerTitleFont(btn)
 			registerCardCorner(addCorner(btn, palette.cornerCard))
 			local btnStroke = addStroke(btn, palette.btnStroke, 1.6, 0.15)
@@ -1140,11 +1180,13 @@ function library:AddWindow(title, options)
 			local container = Instance.new("TextButton")
 			container.Name = "Switch"
 			container.Parent = tabPage
+			container.Active = true
 			container.BackgroundColor3 = palette.cardBg
 			container.BorderSizePixel = 0
 			container.Size = UDim2.new(1, 0, 0, 34)
 			container.Text = ""
 			container.AutoButtonColor = false
+			container.ZIndex = 6
 			registerCardCorner(addCorner(container, palette.cornerCard))
 			local swStroke = addStroke(container, palette.cardStroke, 1.6, 0)
 
@@ -1159,6 +1201,7 @@ function library:AddWindow(title, options)
 			titleLbl.TextSize = 13
 			titleLbl.TextTruncate = Enum.TextTruncate.AtEnd
 			titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+			titleLbl.ZIndex = 7
 			registerBodyFont(titleLbl)
 
 			local pill = Instance.new("Frame")
@@ -1168,6 +1211,7 @@ function library:AddWindow(title, options)
 			pill.BorderSizePixel = 0
 			pill.Position = UDim2.new(1, -48, 0.5, -10)
 			pill.Size = UDim2.new(0, 38, 0, 20)
+			pill.ZIndex = 7
 			addCorner(pill, 10)
 			addStroke(pill, Color3.fromRGB(14, 14, 20), 1.4, 0)
 
@@ -1178,6 +1222,7 @@ function library:AddWindow(title, options)
 			knob.BorderSizePixel = 0
 			knob.Position = UDim2.new(0, 3, 0.5, -7)
 			knob.Size = UDim2.new(0, 14, 0, 14)
+			knob.ZIndex = 8
 			addCorner(knob, 7)
 
 			local toggled = false
@@ -1244,6 +1289,7 @@ function library:AddWindow(title, options)
 			container.BackgroundColor3 = palette.cardBg
 			container.BorderSizePixel = 0
 			container.Size = UDim2.new(1, 0, 0, 44)
+			container.ZIndex = 6
 			registerCardCorner(addCorner(container, palette.cornerCard))
 			local slStroke = addStroke(container, palette.cardStroke, 1.6, 0)
 
@@ -1258,6 +1304,7 @@ function library:AddWindow(title, options)
 			titleLbl.TextSize = 13
 			titleLbl.TextTruncate = Enum.TextTruncate.AtEnd
 			titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+			titleLbl.ZIndex = 7
 			registerBodyFont(titleLbl)
 
 			local valLbl = Instance.new("TextLabel")
@@ -1270,6 +1317,7 @@ function library:AddWindow(title, options)
 			valLbl.TextColor3 = palette.valText
 			valLbl.TextSize = 13
 			valLbl.TextXAlignment = Enum.TextXAlignment.Right
+			valLbl.ZIndex = 7
 			registerTitleFont(valLbl)
 
 			local track = Instance.new("Frame")
@@ -1279,6 +1327,7 @@ function library:AddWindow(title, options)
 			track.BorderSizePixel = 0
 			track.Position = UDim2.new(0, 12, 0, 27)
 			track.Size = UDim2.new(1, -24, 0, 8)
+			track.ZIndex = 7
 			addCorner(track, 4)
 			addStroke(track, Color3.fromRGB(48, 48, 58), 1.2, 0)
 
@@ -1288,6 +1337,7 @@ function library:AddWindow(title, options)
 			fill.BackgroundColor3 = palette.main
 			fill.BorderSizePixel = 0
 			fill.Size = UDim2.new(0, 0, 1, 0)
+			fill.ZIndex = 8
 			addCorner(fill, 4)
 
 			local thumb = Instance.new("Frame")
@@ -1297,6 +1347,7 @@ function library:AddWindow(title, options)
 			thumb.BorderSizePixel = 0
 			thumb.Position = UDim2.new(1, -4, 0.5, -8)
 			thumb.Size = UDim2.new(0, 8, 0, 16)
+			thumb.ZIndex = 9
 			addCorner(thumb, 4)
 			addStroke(thumb, Color3.fromRGB(12, 12, 16), 1.4, 0)
 
@@ -1311,10 +1362,12 @@ function library:AddWindow(title, options)
 			local hitArea = Instance.new("TextButton")
 			hitArea.Name = "HitArea"
 			hitArea.Parent = container
+			hitArea.Active = true
 			hitArea.BackgroundTransparency = 1
 			hitArea.Position = UDim2.new(0, 6, 0, 18)
 			hitArea.Size = UDim2.new(1, -12, 0, 24)
 			hitArea.Text = ""
+			hitArea.ZIndex = 10
 
 			local lastComputed = nil
 
@@ -1365,6 +1418,7 @@ function library:AddWindow(title, options)
 			local box = Instance.new("TextBox")
 			box.Name = "TextBox"
 			box.Parent = tabPage
+			box.Active = true
 			box.BackgroundColor3 = palette.cardBg
 			box.BorderSizePixel = 0
 			box.Size = UDim2.new(1, 0, 0, 32)
@@ -1374,6 +1428,7 @@ function library:AddWindow(title, options)
 			box.TextColor3 = palette.text
 			box.TextSize = 13
 			box.ClearTextOnFocus = false
+			box.ZIndex = 6
 			registerBodyFont(box)
 			registerCardCorner(addCorner(box, palette.cornerCard))
 			local boxStroke = addStroke(box, palette.cardStroke, 1.6, 0)
@@ -1414,12 +1469,14 @@ function library:AddWindow(title, options)
 			wrapper.BorderSizePixel = 0
 			wrapper.ClipsDescendants = true
 			wrapper.Size = UDim2.new(1, 0, 0, 32)
+			wrapper.ZIndex = 6
 			registerCardCorner(addCorner(wrapper, palette.cornerCard))
 			local ddStroke = addStroke(wrapper, palette.cardStroke, 1.6, 0)
 
 			local headerBtn = Instance.new("TextButton")
 			headerBtn.Name = "Header"
 			headerBtn.Parent = wrapper
+			headerBtn.Active = true
 			headerBtn.BackgroundTransparency = 1
 			headerBtn.Size = UDim2.new(1, 0, 0, 32)
 			headerBtn.Text = "   " .. dropdown_name
@@ -1427,6 +1484,7 @@ function library:AddWindow(title, options)
 			headerBtn.TextSize = 13
 			headerBtn.TextTruncate = Enum.TextTruncate.AtEnd
 			headerBtn.TextXAlignment = Enum.TextXAlignment.Left
+			headerBtn.ZIndex = 7
 			registerBodyFont(headerBtn)
 
 			local arrow = Instance.new("TextLabel")
@@ -1439,10 +1497,12 @@ function library:AddWindow(title, options)
 			arrow.Text = "▼"
 			arrow.TextColor3 = palette.valText
 			arrow.TextSize = 11
+			arrow.ZIndex = 8
 
 			local listFrame = Instance.new("ScrollingFrame")
 			listFrame.Name = "Objects"
 			listFrame.Parent = wrapper
+			listFrame.Active = true
 			listFrame.BackgroundTransparency = 1
 			listFrame.BorderSizePixel = 0
 			listFrame.Position = UDim2.new(0, 6, 0, 34)
@@ -1451,6 +1511,7 @@ function library:AddWindow(title, options)
 			listFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 			listFrame.ScrollBarThickness = 2
 			listFrame.ScrollBarImageColor3 = palette.main
+			listFrame.ZIndex = 7
 
 			local isExpanded = false
 
@@ -1478,7 +1539,7 @@ function library:AddWindow(title, options)
 				for _ in pairs(itemsMap) do count = count + 1 end
 				local targetListH = math.min(count * 28, 130)
 				listFrame.Size = UDim2.new(1, -12, 0, targetListH)
-				ddStroke.Color = isExpanded and palette.activeStroke or p.cardStroke
+				ddStroke.Color = isExpanded and palette.activeStroke or palette.cardStroke
 				Tween(wrapper, {Size = UDim2.new(1, 0, 0, isExpanded and (38 + targetListH) or 32)})
 			end
 
@@ -1498,6 +1559,7 @@ function library:AddWindow(title, options)
 				local itemBtn = Instance.new("TextButton")
 				itemBtn.Name = itemName
 				itemBtn.Parent = listFrame
+				itemBtn.Active = true
 				itemBtn.BackgroundColor3 = palette.itemBg
 				itemBtn.BorderSizePixel = 0
 				itemBtn.Size = UDim2.new(1, 0, 0, 24)
@@ -1506,6 +1568,7 @@ function library:AddWindow(title, options)
 				itemBtn.TextSize = 12
 				itemBtn.TextXAlignment = Enum.TextXAlignment.Left
 				itemBtn.AutoButtonColor = false
+				itemBtn.ZIndex = 8
 				registerBodyFont(itemBtn)
 				addCorner(itemBtn, 6)
 
@@ -1571,15 +1634,18 @@ function library:AddWindow(title, options)
 			wrapper.BorderSizePixel = 0
 			wrapper.ClipsDescendants = true
 			wrapper.Size = UDim2.new(1, 0, 0, 34)
+			wrapper.ZIndex = 6
 			registerCardCorner(addCorner(wrapper, palette.cornerCard))
 			local tsStroke = addStroke(wrapper, palette.cardStroke, 1.6, 0)
 
 			local headerBtn = Instance.new("TextButton")
 			headerBtn.Name = "Header"
 			headerBtn.Parent = wrapper
+			headerBtn.Active = true
 			headerBtn.BackgroundTransparency = 1
 			headerBtn.Size = UDim2.new(1, 0, 0, 34)
 			headerBtn.Text = ""
+			headerBtn.ZIndex = 7
 
 			local titleLbl = Instance.new("TextLabel")
 			titleLbl.Name = "Title"
@@ -1592,6 +1658,7 @@ function library:AddWindow(title, options)
 			titleLbl.TextSize = 13
 			titleLbl.TextTruncate = Enum.TextTruncate.AtEnd
 			titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+			titleLbl.ZIndex = 8
 			registerBodyFont(titleLbl)
 
 			local activeDot = Instance.new("Frame")
@@ -1601,6 +1668,7 @@ function library:AddWindow(title, options)
 			activeDot.BorderSizePixel = 0
 			activeDot.Position = UDim2.new(1, -56, 0.5, -8)
 			activeDot.Size = UDim2.new(0, 24, 0, 16)
+			activeDot.ZIndex = 8
 			addCorner(activeDot, 8)
 			addStroke(activeDot, Color3.fromRGB(14, 14, 20), 1.4, 0)
 
@@ -1614,10 +1682,12 @@ function library:AddWindow(title, options)
 			arrow.Text = "▼"
 			arrow.TextColor3 = palette.valText
 			arrow.TextSize = 11
+			arrow.ZIndex = 8
 
 			local listFrame = Instance.new("ScrollingFrame")
 			listFrame.Name = "ThemeList"
 			listFrame.Parent = wrapper
+			listFrame.Active = true
 			listFrame.BackgroundTransparency = 1
 			listFrame.BorderSizePixel = 0
 			listFrame.Position = UDim2.new(0, 8, 0, 38)
@@ -1626,6 +1696,7 @@ function library:AddWindow(title, options)
 			listFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 			listFrame.ScrollBarThickness = 2
 			listFrame.ScrollBarImageColor3 = palette.main
+			listFrame.ZIndex = 7
 
 			local listLayout = Instance.new("UIListLayout")
 			listLayout.Parent = listFrame
@@ -1653,11 +1724,13 @@ function library:AddWindow(title, options)
 				local optBtn = Instance.new("TextButton")
 				optBtn.Name = "Theme_" .. tName
 				optBtn.Parent = listFrame
+				optBtn.Active = true
 				optBtn.BackgroundColor3 = baseBg
 				optBtn.BorderSizePixel = 0
 				optBtn.Size = UDim2.new(1, 0, 0, 28)
 				optBtn.Text = ""
 				optBtn.AutoButtonColor = false
+				optBtn.ZIndex = 8
 				addCorner(optBtn, tInfo.corner_card)
 				local optStroke = addStroke(optBtn, Color3.fromRGB(48, 48, 58), 1.2, 0)
 
@@ -1667,6 +1740,7 @@ function library:AddWindow(title, options)
 				dot.BorderSizePixel = 0
 				dot.Position = UDim2.new(0, 10, 0.5, -7)
 				dot.Size = UDim2.new(0, 14, 0, 14)
+				dot.ZIndex = 9
 				addCorner(dot, 7)
 
 				local nameLbl = Instance.new("TextLabel")
@@ -1679,6 +1753,7 @@ function library:AddWindow(title, options)
 				nameLbl.TextColor3 = tInfo.text_color
 				nameLbl.TextSize = 13
 				nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+				nameLbl.ZIndex = 9
 
 				local iconPreviewLbl = Instance.new("TextLabel")
 				iconPreviewLbl.Parent = optBtn
@@ -1690,6 +1765,7 @@ function library:AddWindow(title, options)
 				iconPreviewLbl.TextColor3 = tInfo.text_color
 				iconPreviewLbl.TextSize = 12
 				iconPreviewLbl.TextXAlignment = Enum.TextXAlignment.Right
+				iconPreviewLbl.ZIndex = 9
 
 				themeOptionRows[tName] = {
 					btn = optBtn,
@@ -1699,12 +1775,12 @@ function library:AddWindow(title, options)
 				}
 
 				runtime:Connect(optBtn.MouseButton1Click, function()
-					window_data:SetTheme(tName)
 					isExpanded = false
 					dropdown_open = false
 					Tween(arrow, {Rotation = 0})
 					tsStroke.Color = palette.cardStroke
 					Tween(wrapper, {Size = UDim2.new(1, 0, 0, 34)})
+					window_data:SetTheme(tName)
 					pcall(callback, tName)
 				end)
 			end
@@ -1753,12 +1829,14 @@ function library:AddWindow(title, options)
 			folderBox.BorderSizePixel = 0
 			folderBox.ClipsDescendants = true
 			folderBox.Size = UDim2.new(1, 0, 0, 32)
+			folderBox.ZIndex = 6
 			registerCardCorner(addCorner(folderBox, palette.cornerCard))
 			local fldStroke = addStroke(folderBox, palette.activeStroke, 1.5, 0.25)
 
 			local folderBtn = Instance.new("TextButton")
 			folderBtn.Name = "Header"
 			folderBtn.Parent = folderBox
+			folderBtn.Active = true
 			folderBtn.BackgroundColor3 = palette.folderHeader
 			folderBtn.BorderSizePixel = 0
 			folderBtn.Size = UDim2.new(1, 0, 0, 32)
@@ -1766,6 +1844,7 @@ function library:AddWindow(title, options)
 			folderBtn.TextColor3 = WHITE
 			folderBtn.TextSize = 13
 			folderBtn.TextXAlignment = Enum.TextXAlignment.Left
+			folderBtn.ZIndex = 7
 			registerTitleFont(folderBtn)
 			registerCardCorner(addCorner(folderBtn, palette.cornerCard))
 
@@ -1782,6 +1861,7 @@ function library:AddWindow(title, options)
 			content.Position = UDim2.new(0, 7, 0, 37)
 			content.Size = UDim2.new(1, -14, 0, 0)
 			content.AutomaticSize = Enum.AutomaticSize.Y
+			content.ZIndex = 7
 
 			local contentLayout = Instance.new("UIListLayout")
 			contentLayout.Parent = content
