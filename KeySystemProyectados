@@ -1,0 +1,240 @@
+local KeySystem = {}
+
+function KeySystem:Init(config)
+    config = config or {}
+    local tweenService = game:GetService("TweenService")
+    local coreGui = game:GetService("CoreGui")
+    local players = game:GetService("Players")
+    local localPlayer = players.LocalPlayer
+
+    local acceptedKeys = config.Keys or {}
+    local whitelist = config.Whitelist or {}
+    local fileName = config.FileName or "LosVaguens_Key.txt"
+    local titleText = config.Title or "PROYECTADOS HUB"
+    local keyLink = config.KeyLink or "https://link-center.net/10253076/q1AAl7og4pTF"
+    local kickTime = config.KickTimeout or 60
+
+    local verified = false
+    local function cleanKey(str)
+        return tostring(str or ""):match("^%s*(.-)%s*$")
+    end
+
+    -- 1. Verificar Whitelist
+    if whitelist[localPlayer.Name] then
+        return true
+    end
+
+    -- 2. Verificar Key Guardada
+    pcall(function()
+        if isfile and readfile and isfile(fileName) then
+            local savedKey = cleanKey(readfile(fileName))
+            if acceptedKeys[savedKey] then
+                verified = true
+            end
+        end
+    end)
+
+    if verified then
+        return true
+    end
+
+    -- 3. Interfaz Mejorada (PC y Móvil)
+    local parentGui = nil
+    pcall(function() parentGui = coreGui end)
+    if not parentGui then
+        parentGui = localPlayer:WaitForChild("PlayerGui")
+    end
+
+    local oldGui = parentGui:FindFirstChild(titleText .. "_KeyUI")
+    if oldGui then oldGui:Destroy() end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = titleText .. "_KeyUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.Parent = parentGui
+
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, 0, 0, 0)
+    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Active = true
+    mainFrame.Draggable = true
+    mainFrame.ClipsDescendants = true
+    mainFrame.Parent = screenGui
+
+    local sizeConstraint = Instance.new("UISizeConstraint")
+    sizeConstraint.MaxSize = Vector2.new(380, 295)
+    sizeConstraint.MinSize = Vector2.new(280, 225)
+    sizeConstraint.Parent = mainFrame
+
+    local uiCorner = Instance.new("UICorner")
+    uiCorner.CornerRadius = UDim.new(0, 12)
+    uiCorner.Parent = mainFrame
+
+    local uiStroke = Instance.new("UIStroke")
+    uiStroke.Color = Color3.fromRGB(138, 43, 226)
+    uiStroke.Thickness = 2
+    uiStroke.Parent = mainFrame
+
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(26, 22, 38)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 22))
+    })
+    gradient.Rotation = 90
+    gradient.Parent = mainFrame
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, -20, 0, 36)
+    titleLabel.Position = UDim2.new(0, 10, 0, 14)
+    titleLabel.Text = titleText
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 21
+    titleLabel.Parent = mainFrame
+
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Size = UDim2.new(1, -20, 0, 22)
+    statusLabel.Position = UDim2.new(0, 10, 0, 48)
+    statusLabel.Text = "Introduce tu Key para continuar"
+    statusLabel.TextColor3 = Color3.fromRGB(175, 175, 190)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.TextSize = 13
+    statusLabel.Parent = mainFrame
+
+    local textBox = Instance.new("TextBox")
+    textBox.Size = UDim2.new(0.86, 0, 0, 42)
+    textBox.Position = UDim2.new(0.5, 0, 0.31, 0)
+    textBox.AnchorPoint = Vector2.new(0.5, 0)
+    textBox.PlaceholderText = "Escribe la Key aquí..."
+    textBox.Text = ""
+    textBox.ClearTextOnFocus = false
+    textBox.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
+    textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textBox.PlaceholderColor3 = Color3.fromRGB(125, 125, 140)
+    textBox.Font = Enum.Font.GothamMedium
+    textBox.TextSize = 14
+    textBox.Parent = mainFrame
+
+    local tbCorner = Instance.new("UICorner")
+    tbCorner.CornerRadius = UDim.new(0, 8)
+    tbCorner.Parent = textBox
+
+    local tbStroke = Instance.new("UIStroke")
+    tbStroke.Color = Color3.fromRGB(65, 65, 85)
+    tbStroke.Thickness = 1
+    tbStroke.Parent = textBox
+
+    local submitButton = Instance.new("TextButton")
+    submitButton.Size = UDim2.new(0.86, 0, 0, 42)
+    submitButton.Position = UDim2.new(0.5, 0, 0.52, 0)
+    submitButton.AnchorPoint = Vector2.new(0.5, 0)
+    submitButton.Text = "VERIFICAR KEY"
+    submitButton.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
+    submitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    submitButton.Font = Enum.Font.GothamBold
+    submitButton.TextSize = 14
+    submitButton.AutoButtonColor = true
+    submitButton.Parent = mainFrame
+
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 8)
+    btnCorner.Parent = submitButton
+
+    local getKeyButton = Instance.new("TextButton")
+    getKeyButton.Size = UDim2.new(0.86, 0, 0, 40)
+    getKeyButton.Position = UDim2.new(0.5, 0, 0.72, 0)
+    getKeyButton.AnchorPoint = Vector2.new(0.5, 0)
+    getKeyButton.Text = "OBTENER KEY"
+    getKeyButton.BackgroundColor3 = Color3.fromRGB(40, 35, 58)
+    getKeyButton.TextColor3 = Color3.fromRGB(215, 185, 255)
+    getKeyButton.Font = Enum.Font.GothamBold
+    getKeyButton.TextSize = 13
+    getKeyButton.AutoButtonColor = true
+    getKeyButton.Parent = mainFrame
+
+    local getKeyCorner = Instance.new("UICorner")
+    getKeyCorner.CornerRadius = UDim.new(0, 8)
+    getKeyCorner.Parent = getKeyButton
+
+    local getKeyStroke = Instance.new("UIStroke")
+    getKeyStroke.Color = Color3.fromRGB(138, 43, 226)
+    getKeyStroke.Thickness = 1
+    getKeyStroke.Parent = getKeyButton
+
+    -- Animación de entrada
+    tweenService:Create(
+        mainFrame,
+        TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        { Size = UDim2.new(0.85, 0, 0.6, 0) }
+    ):Play()
+
+    getKeyButton.MouseButton1Click:Connect(function()
+        pcall(function()
+            if setclipboard then setclipboard(keyLink) end
+        end)
+        getKeyButton.Text = "✔ LINK COPIADO AL PORTAPAPELES"
+        statusLabel.Text = "Pega el link en tu navegador para obtener la Key"
+        statusLabel.TextColor3 = Color3.fromRGB(120, 255, 150)
+        task.wait(2.5)
+        if getKeyButton and getKeyButton.Parent then
+            getKeyButton.Text = "OBTENER KEY"
+            statusLabel.Text = "Introduce tu Key para continuar"
+            statusLabel.TextColor3 = Color3.fromRGB(175, 175, 190)
+        end
+    end)
+
+    submitButton.MouseButton1Click:Connect(function()
+        local inputKey = cleanKey(textBox.Text)
+        if acceptedKeys[inputKey] then
+            verified = true
+            statusLabel.Text = "✔ Key Correcta! Cargando Hub..."
+            statusLabel.TextColor3 = Color3.fromRGB(120, 255, 150)
+            pcall(function()
+                if writefile then writefile(fileName, inputKey) end
+            end)
+            local closeTween = tweenService:Create(
+                mainFrame,
+                TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+                { Size = UDim2.new(0, 0, 0, 0) }
+            )
+            closeTween:Play()
+            closeTween.Completed:Wait()
+            screenGui:Destroy()
+        else
+            textBox.Text = ""
+            textBox.PlaceholderText = "No Quieres Proyectarte?"
+            textBox.PlaceholderColor3 = Color3.fromRGB(255, 85, 85)
+            statusLabel.Text = "✖ Key inválida, inténtalo de nuevo"
+            statusLabel.TextColor3 = Color3.fromRGB(255, 85, 85)
+            tbStroke.Color = Color3.fromRGB(255, 85, 85)
+            task.wait(1.5)
+            if tbStroke and tbStroke.Parent then
+                tbStroke.Color = Color3.fromRGB(65, 65, 85)
+            end
+        end
+    end)
+
+    task.spawn(function()
+        task.wait(kickTime)
+        if not verified then
+            pcall(function()
+                localPlayer:Kick("No podrás Proyectarte junto Nosotros")
+            end)
+        end
+    end)
+
+    while not verified do
+        task.wait(0.1)
+    end
+
+    return true
+end
+
+return KeySystem
