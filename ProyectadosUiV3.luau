@@ -69,10 +69,94 @@ local WHITE = Color3.new(1, 1, 1)
 local BLACK = Color3.new(0, 0, 0)
 local DEFAULT_TWEEN = TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
+-- Catálogo de temas predefinidos (cada uno con paleta, tipografía y geometría única)
+local THEME_ORDER = {
+	"Morado Neón",
+	"Carmesí Imperial",
+	"Ciber Cian",
+	"Esmeralda Tóxica",
+	"Oro Real",
+	"Rosa Sakura",
+	"Mecha Titanio",
+}
+
+local THEMES = {
+	["Morado Neón"] = {
+		main_color = Color3.fromRGB(162, 62, 255),
+		bg_color = Color3.fromRGB(16, 15, 21),
+		text_color = Color3.fromRGB(245, 245, 250),
+		font_title = Enum.Font.GothamBold,
+		font_body = Enum.Font.GothamMedium,
+		corner_window = 14,
+		corner_card = 10,
+		stroke_thickness = 2.2,
+	},
+	["Carmesí Imperial"] = {
+		main_color = Color3.fromRGB(230, 46, 77),
+		bg_color = Color3.fromRGB(20, 12, 14),
+		text_color = Color3.fromRGB(255, 244, 246),
+		font_title = Enum.Font.FredokaOne,
+		font_body = Enum.Font.GothamBold,
+		corner_window = 9,
+		corner_card = 7,
+		stroke_thickness = 2.4,
+	},
+	["Ciber Cian"] = {
+		main_color = Color3.fromRGB(0, 210, 255),
+		bg_color = Color3.fromRGB(11, 18, 28),
+		text_color = Color3.fromRGB(235, 249, 255),
+		font_title = Enum.Font.RobotoMono,
+		font_body = Enum.Font.RobotoMono,
+		corner_window = 6,
+		corner_card = 5,
+		stroke_thickness = 2.0,
+	},
+	["Esmeralda Tóxica"] = {
+		main_color = Color3.fromRGB(30, 215, 96),
+		bg_color = Color3.fromRGB(12, 20, 16),
+		text_color = Color3.fromRGB(240, 255, 245),
+		font_title = Enum.Font.Ubuntu,
+		font_body = Enum.Font.Ubuntu,
+		corner_window = 16,
+		corner_card = 12,
+		stroke_thickness = 2.2,
+	},
+	["Oro Real"] = {
+		main_color = Color3.fromRGB(245, 175, 25),
+		bg_color = Color3.fromRGB(20, 17, 12),
+		text_color = Color3.fromRGB(255, 251, 240),
+		font_title = Enum.Font.TitilliumWeb,
+		font_body = Enum.Font.TitilliumWeb,
+		corner_window = 10,
+		corner_card = 8,
+		stroke_thickness = 2.3,
+	},
+	["Rosa Sakura"] = {
+		main_color = Color3.fromRGB(245, 75, 175),
+		bg_color = Color3.fromRGB(22, 13, 20),
+		text_color = Color3.fromRGB(255, 242, 250),
+		font_title = Enum.Font.Cartoon,
+		font_body = Enum.Font.GothamBold,
+		corner_window = 15,
+		corner_card = 11,
+		stroke_thickness = 2.2,
+	},
+	["Mecha Titanio"] = {
+		main_color = Color3.fromRGB(190, 205, 225),
+		bg_color = Color3.fromRGB(18, 20, 25),
+		text_color = Color3.fromRGB(245, 248, 255),
+		font_title = Enum.Font.Sarpanch,
+		font_body = Enum.Font.Sarpanch,
+		corner_window = 7,
+		corner_card = 6,
+		stroke_thickness = 2.1,
+	},
+}
+
+local DEFAULT_THEME_NAME = "Morado Neón"
+
 local ui_options = {
-	main_color = Color3.fromRGB(162, 62, 255),
-	bg_color = Color3.fromRGB(16, 15, 21),
-	text_color = Color3.fromRGB(245, 245, 250),
+	theme = DEFAULT_THEME_NAME,
 	min_size = Vector2.new(440, 310),
 	toggle_key = Enum.KeyCode.RightShift,
 	can_resize = true,
@@ -88,7 +172,7 @@ local cloneref = type(cloneref) == "function" and cloneref or function(...) retu
 local CoreGui
 if not isSolara then pcall(function() CoreGui = cloneref(game:GetService("CoreGui")) end) end
 
--- Limpieza rápida y directa sin recorrer todo el mapa
+-- Limpieza rápida directa
 do
 	local function destroyImguiIn(parent)
 		if parent and parent.FindFirstChild then
@@ -139,25 +223,6 @@ local function flushConfigFile()
 	end)
 end
 
-local function colorToTable(c)
-	return {
-		r = math.floor(c.R * 255 + 0.5),
-		g = math.floor(c.G * 255 + 0.5),
-		b = math.floor(c.B * 255 + 0.5)
-	}
-end
-
-local function tableToColor(t)
-	if type(t) == "table" and tonumber(t.r) and tonumber(t.g) and tonumber(t.b) then
-		return Color3.fromRGB(
-			math.clamp(tonumber(t.r), 0, 255),
-			math.clamp(tonumber(t.g), 0, 255),
-			math.clamp(tonumber(t.b), 0, 255)
-		)
-	end
-	return nil
-end
-
 local function saveWindowSize(winKey, width, height)
 	local entry = _G.UniversalUISavedConfig[winKey] or {}
 	entry.w = math.floor(width)
@@ -174,31 +239,19 @@ local function getSavedWindowSize(winKey)
 	return nil
 end
 
-local function saveWindowColors(winKey, mainCol, bgCol, textCol)
+local function saveWindowTheme(winKey, themeName)
 	local entry = _G.UniversalUISavedConfig[winKey] or {}
-	if typeof(mainCol) == "Color3" then entry.main_color = colorToTable(mainCol) end
-	if typeof(bgCol) == "Color3" then entry.bg_color = colorToTable(bgCol) end
-	if typeof(textCol) == "Color3" then entry.text_color = colorToTable(textCol) end
+	entry.theme = themeName
 	_G.UniversalUISavedConfig[winKey] = entry
 	flushConfigFile()
 end
 
-local function clearSavedWindowColors(winKey)
+local function getSavedWindowTheme(winKey)
 	local entry = _G.UniversalUISavedConfig[winKey]
-	if type(entry) == "table" then
-		entry.main_color = nil
-		entry.bg_color = nil
-		entry.text_color = nil
-		flushConfigFile()
+	if type(entry) == "table" and type(entry.theme) == "string" and THEMES[entry.theme] then
+		return entry.theme
 	end
-end
-
-local function getSavedWindowColors(winKey)
-	local entry = _G.UniversalUISavedConfig[winKey]
-	if type(entry) == "table" then
-		return tableToColor(entry.main_color), tableToColor(entry.bg_color), tableToColor(entry.text_color)
-	end
-	return nil, nil, nil
+	return nil
 end
 
 local function blendColor(base, target, alpha)
@@ -238,7 +291,7 @@ local function setCameraLocked(locked)
 	end
 end
 
--- Controlador único centralizado para todos los gestos de arrastre y deslizadores
+-- Controlador único centralizado para arrastre y deslizadores
 local activePointer = nil
 
 local function beginPointerDrag(input, onMove, onEnd)
@@ -381,7 +434,7 @@ floatingCorner.CornerRadius = UDim.new(1, 0)
 floatingCorner.Parent = floatingBtn
 
 local floatingStroke = Instance.new("UIStroke")
-floatingStroke.Color = ui_options.main_color
+floatingStroke.Color = THEMES[DEFAULT_THEME_NAME].main_color
 floatingStroke.Thickness = 2.2
 floatingStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 floatingStroke.Parent = floatingBtn
@@ -455,7 +508,10 @@ local function bindWindowDrag(targetFrame, handles)
 end
 
 local windows = 0
-local library = {Runtime = runtime}
+local library = {
+	Runtime = runtime,
+	Themes = THEME_ORDER,
+}
 
 function library:Destroy()
 	runtime:Destroy()
@@ -487,28 +543,31 @@ function library:AddWindow(title, options)
 	local requestedSize = savedSize or defaultSize
 	local initialSize, hardMinSize, vp = getResponsiveDimensions(requestedSize, savedSize ~= nil)
 
-	local defaultMainColor = (typeof(options) == "table" and typeof(options.main_color) == "Color3") and options.main_color or ui_options.main_color
-	local defaultBgColor = (typeof(options) == "table" and typeof(options.bg_color) == "Color3") and options.bg_color or ui_options.bg_color
-	local defaultTextColor = (typeof(options) == "table" and typeof(options.text_color) == "Color3") and options.text_color or ui_options.text_color
-
-	local savedMain, savedBg, savedText = getSavedWindowColors(winKey)
+	local requestedTheme = (typeof(options) == "table" and type(options.theme) == "string" and THEMES[options.theme]) and options.theme or ui_options.theme
+	local initialThemeName = getSavedWindowTheme(winKey) or requestedTheme
 
 	local opts = {
-		main_color = savedMain or defaultMainColor,
-		bg_color = savedBg or defaultBgColor,
-		text_color = savedText or defaultTextColor,
+		theme_name = initialThemeName,
 		min_size = hardMinSize,
 		can_resize = (typeof(options) == "table" and options.can_resize ~= nil) and options.can_resize or ui_options.can_resize,
 		tween_time = 0.15,
 	}
 
-	-- Paleta cacheada (calculada una sola vez por cambio de tema)
+	-- Paleta y estilo cacheado del tema activo
 	local palette = {}
 	local function rebuildPalette()
-		local m, bg, txt = opts.main_color, opts.bg_color, opts.text_color
+		local t = THEMES[opts.theme_name] or THEMES[DEFAULT_THEME_NAME]
+		local m, bg, txt = t.main_color, t.bg_color, t.text_color
+		palette.name = opts.theme_name
 		palette.main = m
 		palette.bg = bg
 		palette.text = txt
+		palette.fontTitle = t.font_title
+		palette.fontBody = t.font_body
+		palette.cornerWindow = t.corner_window
+		palette.cornerCard = t.corner_card
+		palette.strokeThickness = t.stroke_thickness
+
 		palette.winBg = blendColor(bg, m, 0.28)
 		palette.winStroke = shiftColor(m, 0.15)
 		palette.innerRim = blendColor(bg, m, 0.45)
@@ -534,14 +593,45 @@ function library:AddWindow(title, options)
 	rebuildPalette()
 
 	local themeCallbacks = {}
+	local titleFontObjs = {}
+	local bodyFontObjs = {}
+	local cardCornerObjs = {}
+
+	local function registerTitleFont(obj)
+		obj.Font = palette.fontTitle
+		table.insert(titleFontObjs, obj)
+	end
+
+	local function registerBodyFont(obj)
+		obj.Font = palette.fontBody
+		table.insert(bodyFontObjs, obj)
+	end
+
+	local function registerCardCorner(corner)
+		corner.CornerRadius = UDim.new(0, palette.cornerCard)
+		table.insert(cardCornerObjs, corner)
+	end
+
 	local function onThemeChange(fn)
 		table.insert(themeCallbacks, fn)
 		pcall(fn, palette)
 	end
+
 	local function broadcastTheme()
 		rebuildPalette()
 		floatingStroke.Color = palette.main
 		floatingBtn.BackgroundColor3 = palette.floatingBg
+
+		local cardRadius = UDim.new(0, palette.cornerCard)
+		for i = 1, #titleFontObjs do
+			titleFontObjs[i].Font = palette.fontTitle
+		end
+		for i = 1, #bodyFontObjs do
+			bodyFontObjs[i].Font = palette.fontBody
+		end
+		for i = 1, #cardCornerObjs do
+			cardCornerObjs[i].CornerRadius = cardRadius
+		end
 		for i = 1, #themeCallbacks do
 			pcall(themeCallbacks[i], palette)
 		end
@@ -556,7 +646,7 @@ function library:AddWindow(title, options)
 	local BORDER_THICKNESS = 4
 	local MINIMIZED_HEIGHT = 34 + (BORDER_THICKNESS * 2)
 
-	-- Marco Exterior Oscuro con Contorno Neón Morado
+	-- Marco Exterior Oscuro con Contorno Neón
 	local Window = Instance.new("Frame")
 	Window.Name = "Window_" .. windows
 	Window.Parent = windowsFrame
@@ -566,8 +656,8 @@ function library:AddWindow(title, options)
 	Window.ClipsDescendants = true
 	Window.Position = UDim2.new(0, startX, 0, startY)
 	Window.Size = UDim2.new(0, initialSize.X, 0, initialSize.Y)
-	addCorner(Window, 14)
-	local windowNeonStroke = addStroke(Window, palette.winStroke, 2.2, 0)
+	local windowCorner = addCorner(Window, palette.cornerWindow)
+	local windowNeonStroke = addStroke(Window, palette.winStroke, palette.strokeThickness, 0)
 
 	-- Contenedor Interior Carbón Oscuro
 	local InnerFrame = Instance.new("Frame")
@@ -578,10 +668,10 @@ function library:AddWindow(title, options)
 	InnerFrame.ClipsDescendants = true
 	InnerFrame.Position = UDim2.new(0, BORDER_THICKNESS, 0, BORDER_THICKNESS)
 	InnerFrame.Size = UDim2.new(1, -(BORDER_THICKNESS * 2), 1, -(BORDER_THICKNESS * 2))
-	addCorner(InnerFrame, 11)
+	local innerCorner = addCorner(InnerFrame, math.max(4, palette.cornerWindow - 3))
 	local innerRimStroke = addStroke(InnerFrame, palette.innerRim, 1.3, 0.25)
 
-	-- Barra Superior Morada Oscura con línea de brillo neón
+	-- Barra Superior con línea de brillo neón
 	local Bar = Instance.new("Frame")
 	Bar.Name = "Bar"
 	Bar.Parent = InnerFrame
@@ -589,7 +679,7 @@ function library:AddWindow(title, options)
 	Bar.BackgroundColor3 = palette.barBg
 	Bar.BorderSizePixel = 0
 	Bar.Size = UDim2.new(1, 0, 0, 34)
-	addCorner(Bar, 11)
+	local barCorner = addCorner(Bar, math.max(4, palette.cornerWindow - 3))
 
 	local BarCover = Instance.new("Frame")
 	BarCover.Name = "BarCover"
@@ -612,7 +702,14 @@ function library:AddWindow(title, options)
 
 	onThemeChange(function(p)
 		Window.BackgroundColor3 = p.winBg
+		windowCorner.CornerRadius = UDim.new(0, p.cornerWindow)
 		windowNeonStroke.Color = p.winStroke
+		windowNeonStroke.Thickness = p.strokeThickness
+
+		local innerR = UDim.new(0, math.max(4, p.cornerWindow - 3))
+		innerCorner.CornerRadius = innerR
+		barCorner.CornerRadius = innerR
+
 		InnerFrame.BackgroundColor3 = p.bg
 		innerRimStroke.Color = p.innerRim
 		Bar.BackgroundColor3 = p.barBg
@@ -646,13 +743,13 @@ function library:AddWindow(title, options)
 	TitleLabel.BackgroundTransparency = 1
 	TitleLabel.Position = UDim2.new(0, 38, 0, 0)
 	TitleLabel.Size = UDim2.new(1, -48, 1, 0)
-	TitleLabel.Font = Enum.Font.GothamBold
 	TitleLabel.Text = tostring(title or "New Window")
 	TitleLabel.TextColor3 = WHITE
 	TitleLabel.TextSize = 14
 	TitleLabel.TextTruncate = Enum.TextTruncate.AtEnd
 	TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 	TitleLabel.ZIndex = 3
+	registerTitleFont(TitleLabel)
 
 	-- Panel Lateral Izquierdo de Pestañas
 	local sidebarW = isCompactDevice() and 96 or 114
@@ -669,7 +766,7 @@ function library:AddWindow(title, options)
 	TabSelection.ScrollBarThickness = 3
 	TabSelection.ScrollBarImageColor3 = palette.main
 	TabSelection.Visible = false
-	addCorner(TabSelection, 10)
+	registerCardCorner(addCorner(TabSelection, palette.cornerCard))
 	local sbStroke = addStroke(TabSelection, palette.cardStroke, 1.5, 0)
 
 	onThemeChange(function(p)
@@ -826,46 +923,26 @@ function library:AddWindow(title, options)
 		end
 	end
 
-	function window_data:SetMainColor(new_color)
-		if typeof(new_color) == "Color3" then
-			opts.main_color = new_color
+	function window_data:SetTheme(themeName)
+		if type(themeName) == "string" and THEMES[themeName] then
+			opts.theme_name = themeName
 			broadcastTheme()
-			saveWindowColors(winKey, opts.main_color, nil, nil)
+			saveWindowTheme(winKey, themeName)
 		end
 	end
 
-	function window_data:SetBackgroundColor(new_color)
-		if typeof(new_color) == "Color3" then
-			opts.bg_color = new_color
-			broadcastTheme()
-			saveWindowColors(winKey, nil, opts.bg_color, nil)
-		end
+	function window_data:GetTheme()
+		return opts.theme_name
 	end
 
-	function window_data:SetTextColor(new_color)
-		if typeof(new_color) == "Color3" then
-			opts.text_color = new_color
-			broadcastTheme()
-			saveWindowColors(winKey, nil, nil, opts.text_color)
-		end
+	function window_data:GetThemes()
+		return THEME_ORDER
 	end
 
-	function window_data:SetColors(color_table)
-		if typeof(color_table) ~= "table" then return end
-		if typeof(color_table.main_color) == "Color3" then opts.main_color = color_table.main_color end
-		if typeof(color_table.bg_color) == "Color3" then opts.bg_color = color_table.bg_color end
-		if typeof(color_table.text_color) == "Color3" then opts.text_color = color_table.text_color end
-		broadcastTheme()
-		saveWindowColors(winKey, opts.main_color, opts.bg_color, opts.text_color)
+	function window_data:ResetTheme()
+		window_data:SetTheme(requestedTheme)
 	end
-
-	function window_data:ResetColors()
-		opts.main_color = defaultMainColor
-		opts.bg_color = defaultBgColor
-		opts.text_color = defaultTextColor
-		broadcastTheme()
-		clearSavedWindowColors(winKey)
-	end
+	window_data.ResetColors = window_data.ResetTheme
 
 	local dropdown_open = false
 	local activeTabBtn = nil
@@ -907,7 +984,6 @@ function library:AddWindow(title, options)
 		tabBtn.Parent = TabButtons
 		tabBtn.BackgroundColor3 = palette.cardBg
 		tabBtn.BorderSizePixel = 0
-		tabBtn.Font = Enum.Font.GothamBold
 		tabBtn.Text = "  " .. tab_name
 		tabBtn.TextColor3 = palette.tabTextOff
 		tabBtn.TextSize = 12
@@ -915,7 +991,8 @@ function library:AddWindow(title, options)
 		tabBtn.TextXAlignment = Enum.TextXAlignment.Left
 		tabBtn.AutoButtonColor = false
 		tabBtn.Size = UDim2.new(1, 0, 0, 30)
-		addCorner(tabBtn, 10)
+		registerBodyFont(tabBtn)
+		registerCardCorner(addCorner(tabBtn, palette.cornerCard))
 		tabStrokes[tabBtn] = addStroke(tabBtn, palette.cardStroke, 1.5, 0)
 
 		local tabPage = Instance.new("ScrollingFrame")
@@ -948,7 +1025,7 @@ function library:AddWindow(title, options)
 		pageLayout.Padding = UDim.new(0, 6)
 
 		local function showTab()
-			if dropdown_open or activeTabBtn == tabBtn then return end
+			if activeTabBtn == tabBtn then return end
 			if activeTabBtn then styleTabBtn(activeTabBtn, false) end
 			if activeTabPage then activeTabPage.Visible = false end
 			activeTabBtn = tabBtn
@@ -968,12 +1045,12 @@ function library:AddWindow(title, options)
 			lbl.BackgroundTransparency = 1
 			lbl.Size = UDim2.new(1, 0, 0, 22)
 			lbl.AutomaticSize = Enum.AutomaticSize.Y
-			lbl.Font = Enum.Font.GothamBold
 			lbl.Text = tostring(label_text or "Label")
 			lbl.TextColor3 = palette.text
 			lbl.TextSize = 13
 			lbl.TextWrapped = true
 			lbl.TextXAlignment = Enum.TextXAlignment.Left
+			registerTitleFont(lbl)
 
 			onThemeChange(function(p)
 				lbl.TextColor3 = p.text
@@ -992,12 +1069,12 @@ function library:AddWindow(title, options)
 			btn.BackgroundColor3 = palette.main
 			btn.BorderSizePixel = 0
 			btn.Size = UDim2.new(1, 0, 0, 32)
-			btn.Font = Enum.Font.GothamBold
 			btn.Text = tostring(button_text or "Button")
 			btn.TextColor3 = WHITE
 			btn.TextSize = 13
 			btn.AutoButtonColor = false
-			addCorner(btn, 9)
+			registerTitleFont(btn)
+			registerCardCorner(addCorner(btn, palette.cornerCard))
 			local btnStroke = addStroke(btn, palette.btnStroke, 1.6, 0.15)
 
 			onThemeChange(function(p)
@@ -1037,7 +1114,7 @@ function library:AddWindow(title, options)
 			container.Size = UDim2.new(1, 0, 0, 34)
 			container.Text = ""
 			container.AutoButtonColor = false
-			addCorner(container, 10)
+			registerCardCorner(addCorner(container, palette.cornerCard))
 			local swStroke = addStroke(container, palette.cardStroke, 1.6, 0)
 
 			local titleLbl = Instance.new("TextLabel")
@@ -1046,12 +1123,12 @@ function library:AddWindow(title, options)
 			titleLbl.BackgroundTransparency = 1
 			titleLbl.Position = UDim2.new(0, 12, 0, 0)
 			titleLbl.Size = UDim2.new(1, -64, 1, 0)
-			titleLbl.Font = Enum.Font.GothamBold
 			titleLbl.Text = tostring(switch_text or "Switch")
 			titleLbl.TextColor3 = palette.text
 			titleLbl.TextSize = 13
 			titleLbl.TextTruncate = Enum.TextTruncate.AtEnd
 			titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+			registerBodyFont(titleLbl)
 
 			local pill = Instance.new("Frame")
 			pill.Name = "Pill"
@@ -1136,7 +1213,7 @@ function library:AddWindow(title, options)
 			container.BackgroundColor3 = palette.cardBg
 			container.BorderSizePixel = 0
 			container.Size = UDim2.new(1, 0, 0, 44)
-			addCorner(container, 10)
+			registerCardCorner(addCorner(container, palette.cornerCard))
 			local slStroke = addStroke(container, palette.cardStroke, 1.6, 0)
 
 			local titleLbl = Instance.new("TextLabel")
@@ -1145,12 +1222,12 @@ function library:AddWindow(title, options)
 			titleLbl.BackgroundTransparency = 1
 			titleLbl.Position = UDim2.new(0, 12, 0, 4)
 			titleLbl.Size = UDim2.new(1, -74, 0, 18)
-			titleLbl.Font = Enum.Font.GothamBold
 			titleLbl.Text = tostring(slider_text or "Slider")
 			titleLbl.TextColor3 = palette.text
 			titleLbl.TextSize = 13
 			titleLbl.TextTruncate = Enum.TextTruncate.AtEnd
 			titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+			registerBodyFont(titleLbl)
 
 			local valLbl = Instance.new("TextLabel")
 			valLbl.Name = "Value"
@@ -1158,11 +1235,11 @@ function library:AddWindow(title, options)
 			valLbl.BackgroundTransparency = 1
 			valLbl.Position = UDim2.new(1, -62, 0, 4)
 			valLbl.Size = UDim2.new(0, 50, 0, 18)
-			valLbl.Font = Enum.Font.GothamBold
 			valLbl.Text = tostring(minVal)
 			valLbl.TextColor3 = palette.valText
 			valLbl.TextSize = 13
 			valLbl.TextXAlignment = Enum.TextXAlignment.Right
+			registerTitleFont(valLbl)
 
 			local track = Instance.new("Frame")
 			track.Name = "Track"
@@ -1260,14 +1337,14 @@ function library:AddWindow(title, options)
 			box.BackgroundColor3 = palette.cardBg
 			box.BorderSizePixel = 0
 			box.Size = UDim2.new(1, 0, 0, 32)
-			box.Font = Enum.Font.GothamBold
 			box.PlaceholderText = tostring(textbox_text or "Input Text")
 			box.PlaceholderColor3 = palette.placeholder
 			box.Text = ""
 			box.TextColor3 = palette.text
 			box.TextSize = 13
 			box.ClearTextOnFocus = false
-			addCorner(box, 10)
+			registerBodyFont(box)
+			registerCardCorner(addCorner(box, palette.cornerCard))
 			local boxStroke = addStroke(box, palette.cardStroke, 1.6, 0)
 
 			onThemeChange(function(p)
@@ -1306,7 +1383,7 @@ function library:AddWindow(title, options)
 			wrapper.BorderSizePixel = 0
 			wrapper.ClipsDescendants = true
 			wrapper.Size = UDim2.new(1, 0, 0, 32)
-			addCorner(wrapper, 10)
+			registerCardCorner(addCorner(wrapper, palette.cornerCard))
 			local ddStroke = addStroke(wrapper, palette.cardStroke, 1.6, 0)
 
 			local headerBtn = Instance.new("TextButton")
@@ -1314,12 +1391,12 @@ function library:AddWindow(title, options)
 			headerBtn.Parent = wrapper
 			headerBtn.BackgroundTransparency = 1
 			headerBtn.Size = UDim2.new(1, 0, 0, 32)
-			headerBtn.Font = Enum.Font.GothamBold
 			headerBtn.Text = "   " .. dropdown_name
 			headerBtn.TextColor3 = palette.text
 			headerBtn.TextSize = 13
 			headerBtn.TextTruncate = Enum.TextTruncate.AtEnd
 			headerBtn.TextXAlignment = Enum.TextXAlignment.Left
+			registerBodyFont(headerBtn)
 
 			local arrow = Instance.new("TextLabel")
 			arrow.Name = "Arrow"
@@ -1393,12 +1470,12 @@ function library:AddWindow(title, options)
 				itemBtn.BackgroundColor3 = palette.itemBg
 				itemBtn.BorderSizePixel = 0
 				itemBtn.Size = UDim2.new(1, 0, 0, 24)
-				itemBtn.Font = Enum.Font.GothamBold
 				itemBtn.Text = "  " .. itemName
 				itemBtn.TextColor3 = palette.text
 				itemBtn.TextSize = 12
 				itemBtn.TextXAlignment = Enum.TextXAlignment.Left
 				itemBtn.AutoButtonColor = false
+				registerBodyFont(itemBtn)
 				addCorner(itemBtn, 6)
 
 				itemsMap[itemName] = itemBtn
@@ -1450,22 +1527,21 @@ function library:AddWindow(title, options)
 			return dropdown_data, wrapper
 		end
 
-		-- ELEMENTO: COLOR PICKER
-		function tab_data:AddColorPicker(picker_text, callback, default_col)
-			local picker_data = {}
-			picker_text = tostring(picker_text or "Color Principal")
+		-- ELEMENTO: SELECTOR DESPLEGABLE DE TEMAS (Colores + Tipografía + Geometría)
+		function tab_data:AddThemeSelector(selector_text, callback)
+			local selector_data = {}
+			selector_text = tostring(selector_text or "Tema de Interfaz")
 			callback = typeof(callback) == "function" and callback or function() end
-			local currentColor = (typeof(default_col) == "Color3") and default_col or opts.main_color
 
 			local wrapper = Instance.new("Frame")
-			wrapper.Name = "ColorPicker"
+			wrapper.Name = "ThemeSelector"
 			wrapper.Parent = tabPage
 			wrapper.BackgroundColor3 = palette.cardBg
 			wrapper.BorderSizePixel = 0
 			wrapper.ClipsDescendants = true
 			wrapper.Size = UDim2.new(1, 0, 0, 34)
-			addCorner(wrapper, 10)
-			local cpStroke = addStroke(wrapper, palette.cardStroke, 1.6, 0)
+			registerCardCorner(addCorner(wrapper, palette.cornerCard))
+			local tsStroke = addStroke(wrapper, palette.cardStroke, 1.6, 0)
 
 			local headerBtn = Instance.new("TextButton")
 			headerBtn.Name = "Header"
@@ -1479,196 +1555,149 @@ function library:AddWindow(title, options)
 			titleLbl.Parent = headerBtn
 			titleLbl.BackgroundTransparency = 1
 			titleLbl.Position = UDim2.new(0, 12, 0, 0)
-			titleLbl.Size = UDim2.new(1, -58, 1, 0)
-			titleLbl.Font = Enum.Font.GothamBold
-			titleLbl.Text = picker_text
+			titleLbl.Size = UDim2.new(1, -78, 1, 0)
+			titleLbl.Text = selector_text .. ": " .. opts.theme_name
 			titleLbl.TextColor3 = palette.text
 			titleLbl.TextSize = 13
 			titleLbl.TextTruncate = Enum.TextTruncate.AtEnd
 			titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+			registerBodyFont(titleLbl)
 
-			local previewBox = Instance.new("Frame")
-			previewBox.Name = "Preview"
-			previewBox.Parent = headerBtn
-			previewBox.BackgroundColor3 = currentColor
-			previewBox.BorderSizePixel = 0
-			previewBox.Position = UDim2.new(1, -44, 0.5, -10)
-			previewBox.Size = UDim2.new(0, 32, 0, 20)
-			addCorner(previewBox, 6)
-			addStroke(previewBox, Color3.fromRGB(14, 14, 20), 1.5, 0)
+			local activeDot = Instance.new("Frame")
+			activeDot.Name = "ActiveDot"
+			activeDot.Parent = headerBtn
+			activeDot.BackgroundColor3 = palette.main
+			activeDot.BorderSizePixel = 0
+			activeDot.Position = UDim2.new(1, -56, 0.5, -8)
+			activeDot.Size = UDim2.new(0, 24, 0, 16)
+			addCorner(activeDot, 8)
+			addStroke(activeDot, Color3.fromRGB(14, 14, 20), 1.4, 0)
 
-			local expanded = false
+			local arrow = Instance.new("TextLabel")
+			arrow.Name = "Arrow"
+			arrow.Parent = headerBtn
+			arrow.BackgroundTransparency = 1
+			arrow.Position = UDim2.new(1, -28, 0, 0)
+			arrow.Size = UDim2.new(0, 20, 1, 0)
+			arrow.Font = Enum.Font.GothamBold
+			arrow.Text = "▼"
+			arrow.TextColor3 = palette.valText
+			arrow.TextSize = 11
+
+			local listFrame = Instance.new("ScrollingFrame")
+			listFrame.Name = "ThemeList"
+			listFrame.Parent = wrapper
+			listFrame.BackgroundTransparency = 1
+			listFrame.BorderSizePixel = 0
+			listFrame.Position = UDim2.new(0, 8, 0, 38)
+			listFrame.Size = UDim2.new(1, -16, 0, 146)
+			listFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+			listFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+			listFrame.ScrollBarThickness = 2
+			listFrame.ScrollBarImageColor3 = palette.main
+
+			local listLayout = Instance.new("UIListLayout")
+			listLayout.Parent = listFrame
+			listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			listLayout.Padding = UDim.new(0, 5)
+
+			local isExpanded = false
+			local themeOptionRows = {}
+
+			local function refreshOptionHighlights()
+				titleLbl.Text = selector_text .. ": " .. opts.theme_name
+				activeDot.BackgroundColor3 = palette.main
+				for name, rowData in pairs(themeOptionRows) do
+					local isCurrent = (name == opts.theme_name)
+					rowData.btn.BackgroundColor3 = isCurrent and palette.activeBg or rowData.baseBg
+					rowData.stroke.Color = isCurrent and rowData.accent or Color3.fromRGB(48, 48, 58)
+					rowData.stroke.Thickness = isCurrent and 1.8 or 1.2
+				end
+			end
+
+			for _, tName in ipairs(THEME_ORDER) do
+				local tInfo = THEMES[tName]
+				local baseBg = shiftColor(tInfo.bg_color, 0.06)
+
+				local optBtn = Instance.new("TextButton")
+				optBtn.Name = "Theme_" .. tName
+				optBtn.Parent = listFrame
+				optBtn.BackgroundColor3 = baseBg
+				optBtn.BorderSizePixel = 0
+				optBtn.Size = UDim2.new(1, 0, 0, 28)
+				optBtn.Text = ""
+				optBtn.AutoButtonColor = false
+				addCorner(optBtn, tInfo.corner_card)
+				local optStroke = addStroke(optBtn, Color3.fromRGB(48, 48, 58), 1.2, 0)
+
+				local dot = Instance.new("Frame")
+				dot.Parent = optBtn
+				dot.BackgroundColor3 = tInfo.main_color
+				dot.BorderSizePixel = 0
+				dot.Position = UDim2.new(0, 10, 0.5, -7)
+				dot.Size = UDim2.new(0, 14, 0, 14)
+				addCorner(dot, 7)
+
+				local nameLbl = Instance.new("TextLabel")
+				nameLbl.Parent = optBtn
+				nameLbl.BackgroundTransparency = 1
+				nameLbl.Position = UDim2.new(0, 32, 0, 0)
+				nameLbl.Size = UDim2.new(1, -42, 1, 0)
+				nameLbl.Font = tInfo.font_title
+				nameLbl.Text = tName
+				nameLbl.TextColor3 = tInfo.text_color
+				nameLbl.TextSize = 13
+				nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+				themeOptionRows[tName] = {
+					btn = optBtn,
+					stroke = optStroke,
+					baseBg = baseBg,
+					accent = tInfo.main_color,
+				}
+
+				runtime:Connect(optBtn.MouseButton1Click, function()
+					window_data:SetTheme(tName)
+					isExpanded = false
+					dropdown_open = false
+					Tween(arrow, {Rotation = 0})
+					tsStroke.Color = palette.cardStroke
+					Tween(wrapper, {Size = UDim2.new(1, 0, 0, 34)})
+					pcall(callback, tName)
+				end)
+			end
 
 			onThemeChange(function(p)
 				wrapper.BackgroundColor3 = p.cardBg
-				cpStroke.Color = expanded and p.activeStroke or p.cardStroke
+				tsStroke.Color = isExpanded and p.activeStroke or p.cardStroke
 				titleLbl.TextColor3 = p.text
+				arrow.TextColor3 = p.valText
+				listFrame.ScrollBarImageColor3 = p.main
+				refreshOptionHighlights()
 			end)
-
-			local panel = Instance.new("Frame")
-			panel.Name = "Panel"
-			panel.Parent = wrapper
-			panel.BackgroundTransparency = 1
-			panel.Position = UDim2.new(0, 10, 0, 38)
-			panel.Size = UDim2.new(1, -20, 0, 104)
-
-			local presetsRow = Instance.new("Frame")
-			presetsRow.Name = "Presets"
-			presetsRow.Parent = panel
-			presetsRow.BackgroundTransparency = 1
-			presetsRow.Size = UDim2.new(1, 0, 0, 22)
-
-			local presetLayout = Instance.new("UIListLayout")
-			presetLayout.Parent = presetsRow
-			presetLayout.FillDirection = Enum.FillDirection.Horizontal
-			presetLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-			presetLayout.Padding = UDim.new(0, 6)
-
-			local presetColors = {
-				Color3.fromRGB(162, 62, 255),
-				Color3.fromRGB(0, 155, 235),
-				Color3.fromRGB(215, 50, 75),
-				Color3.fromRGB(45, 195, 105),
-				Color3.fromRGB(235, 140, 30),
-				Color3.fromRGB(225, 65, 165),
-				Color3.fromRGB(16, 15, 21),
-			}
-
-			local rgbUpdaters = {}
-
-			local function applyColor(col, triggerCallback)
-				currentColor = col
-				previewBox.BackgroundColor3 = col
-				for i = 1, #rgbUpdaters do
-					rgbUpdaters[i](col)
-				end
-				if triggerCallback then
-					pcall(callback, col)
-				end
-			end
-
-			for _, pCol in ipairs(presetColors) do
-				local swatch = Instance.new("TextButton")
-				swatch.Parent = presetsRow
-				swatch.BackgroundColor3 = pCol
-				swatch.BorderSizePixel = 0
-				swatch.Size = UDim2.new(0, 20, 0, 20)
-				swatch.Text = ""
-				swatch.AutoButtonColor = false
-				addCorner(swatch, 10)
-				addStroke(swatch, Color3.fromRGB(14, 14, 20), 1.4, 0)
-
-				runtime:Connect(swatch.MouseButton1Click, function()
-					applyColor(pCol, true)
-				end)
-			end
-
-			local channels = {
-				{name = "R", col = Color3.fromRGB(230, 65, 65), y = 28},
-				{name = "G", col = Color3.fromRGB(65, 210, 100), y = 54},
-				{name = "B", col = Color3.fromRGB(65, 155, 245), y = 80},
-			}
-
-			local rVal = math.floor(currentColor.R * 255 + 0.5)
-			local gVal = math.floor(currentColor.G * 255 + 0.5)
-			local bVal = math.floor(currentColor.B * 255 + 0.5)
-
-			for idx, ch in ipairs(channels) do
-				local row = Instance.new("Frame")
-				row.Parent = panel
-				row.BackgroundTransparency = 1
-				row.Position = UDim2.new(0, 0, 0, ch.y)
-				row.Size = UDim2.new(1, 0, 0, 20)
-
-				local tag = Instance.new("TextLabel")
-				tag.Parent = row
-				tag.BackgroundTransparency = 1
-				tag.Size = UDim2.new(0, 16, 1, 0)
-				tag.Font = Enum.Font.GothamBold
-				tag.Text = ch.name
-				tag.TextColor3 = ch.col
-				tag.TextSize = 12
-
-				local numLbl = Instance.new("TextLabel")
-				numLbl.Parent = row
-				numLbl.BackgroundTransparency = 1
-				numLbl.Position = UDim2.new(1, -28, 0, 0)
-				numLbl.Size = UDim2.new(0, 28, 1, 0)
-				numLbl.Font = Enum.Font.GothamBold
-				numLbl.Text = "0"
-				numLbl.TextColor3 = palette.text
-				numLbl.TextSize = 11
-				numLbl.TextXAlignment = Enum.TextXAlignment.Right
-
-				onThemeChange(function(p)
-					numLbl.TextColor3 = p.text
-				end)
-
-				local barTrack = Instance.new("Frame")
-				barTrack.Parent = row
-				barTrack.BackgroundColor3 = Color3.fromRGB(16, 16, 22)
-				barTrack.BorderSizePixel = 0
-				barTrack.Position = UDim2.new(0, 20, 0.5, -4)
-				barTrack.Size = UDim2.new(1, -52, 0, 8)
-				addCorner(barTrack, 4)
-
-				local barFill = Instance.new("Frame")
-				barFill.Parent = barTrack
-				barFill.BackgroundColor3 = ch.col
-				barFill.BorderSizePixel = 0
-				barFill.Size = UDim2.new(0, 0, 1, 0)
-				addCorner(barFill, 4)
-
-				local hit = Instance.new("TextButton")
-				hit.Parent = row
-				hit.BackgroundTransparency = 1
-				hit.Position = UDim2.new(0, 16, 0, -2)
-				hit.Size = UDim2.new(1, -44, 1, 4)
-				hit.Text = ""
-
-				local function syncChannelVisual(col)
-					local v = (idx == 1 and col.R) or (idx == 2 and col.G) or col.B
-					local intV = math.floor(v * 255 + 0.5)
-					if idx == 1 then rVal = intV elseif idx == 2 then gVal = intV else bVal = intV end
-					barFill.Size = UDim2.new(math.clamp(v, 0, 1), 0, 1, 0)
-					numLbl.Text = tostring(intV)
-				end
-
-				table.insert(rgbUpdaters, syncChannelVisual)
-				syncChannelVisual(currentColor)
-
-				local function updateCh(pos)
-					local ratio = math.clamp((pos.X - barTrack.AbsolutePosition.X) / math.max(1, barTrack.AbsoluteSize.X), 0, 1)
-					local intV = math.floor(ratio * 255 + 0.5)
-					local prevV = (idx == 1 and rVal) or (idx == 2 and gVal) or bVal
-					if intV == prevV then return end
-					if idx == 1 then rVal = intV elseif idx == 2 then gVal = intV else bVal = intV end
-					applyColor(Color3.fromRGB(rVal, gVal, bVal), true)
-				end
-
-				runtime:Connect(hit.InputBegan, function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-						if beginPointerDrag(input, updateCh) then
-							updateCh(input.Position)
-						end
-					end
-				end)
-			end
 
 			runtime:Connect(headerBtn.MouseButton1Click, function()
-				expanded = not expanded
-				cpStroke.Color = expanded and palette.activeStroke or palette.cardStroke
-				Tween(wrapper, {Size = UDim2.new(1, 0, 0, expanded and 148 or 34)})
+				isExpanded = not isExpanded
+				dropdown_open = isExpanded
+				Tween(arrow, {Rotation = isExpanded and 180 or 0})
+				tsStroke.Color = isExpanded and palette.activeStroke or palette.cardStroke
+				local listH = math.min(#THEME_ORDER * 33, 150)
+				listFrame.Size = UDim2.new(1, -16, 0, listH)
+				Tween(wrapper, {Size = UDim2.new(1, 0, 0, isExpanded and (44 + listH) or 34)})
 			end)
 
-			function picker_data:Set(col)
-				if typeof(col) == "Color3" then
-					applyColor(col, true)
+			function selector_data:Set(themeName)
+				if type(themeName) == "string" and THEMES[themeName] then
+					window_data:SetTheme(themeName)
+					pcall(callback, themeName)
 				end
 			end
 
-			return picker_data, wrapper
+			return selector_data, wrapper
 		end
+
+		-- Alias por compatibilidad
+		tab_data.AddThemeDropdown = tab_data.AddThemeSelector
 
 		-- ELEMENTO: FOLDER
 		function tab_data:AddFolder(folder_name)
@@ -1682,7 +1711,7 @@ function library:AddWindow(title, options)
 			folderBox.BorderSizePixel = 0
 			folderBox.ClipsDescendants = true
 			folderBox.Size = UDim2.new(1, 0, 0, 32)
-			addCorner(folderBox, 10)
+			registerCardCorner(addCorner(folderBox, palette.cornerCard))
 			local fldStroke = addStroke(folderBox, palette.activeStroke, 1.5, 0.25)
 
 			local folderBtn = Instance.new("TextButton")
@@ -1691,12 +1720,12 @@ function library:AddWindow(title, options)
 			folderBtn.BackgroundColor3 = palette.folderHeader
 			folderBtn.BorderSizePixel = 0
 			folderBtn.Size = UDim2.new(1, 0, 0, 32)
-			folderBtn.Font = Enum.Font.GothamBold
 			folderBtn.Text = "  ▸  " .. folder_name
 			folderBtn.TextColor3 = WHITE
 			folderBtn.TextSize = 13
 			folderBtn.TextXAlignment = Enum.TextXAlignment.Left
-			addCorner(folderBtn, 9)
+			registerTitleFont(folderBtn)
+			registerCardCorner(addCorner(folderBtn, palette.cornerCard))
 
 			onThemeChange(function(p)
 				folderBox.BackgroundColor3 = p.sidebarBg
