@@ -69,7 +69,7 @@ local WHITE = Color3.new(1, 1, 1)
 local BLACK = Color3.new(0, 0, 0)
 local DEFAULT_TWEEN = TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
--- Catálogo de temas planos (sin Default Elirium, sin neón ni degradados)
+-- Catálogo de temas planos (sin neón ni degradados)
 local THEME_ORDER = {
 	"Morado Neón",
 	"Carmesí Imperial",
@@ -92,6 +92,8 @@ local THEMES = {
 		stroke_thickness = 1.4,
 		open_icon = "🔮",
 		closed_icon = "💜",
+		gui_icon = "⚙️",
+		gui_hidden_icon = "👁️",
 	},
 	["Carmesí Imperial"] = {
 		main_color = Color3.fromRGB(184, 58, 76),
@@ -104,6 +106,8 @@ local THEMES = {
 		stroke_thickness = 1.4,
 		open_icon = "👑",
 		closed_icon = "🌹",
+		gui_icon = "🗡️",
+		gui_hidden_icon = "🥀",
 	},
 	["Ciber Cian"] = {
 		main_color = Color3.fromRGB(46, 152, 194),
@@ -116,6 +120,8 @@ local THEMES = {
 		stroke_thickness = 1.3,
 		open_icon = "⚡",
 		closed_icon = "💠",
+		gui_icon = "🖥️",
+		gui_hidden_icon = "🔌",
 	},
 	["Esmeralda Tóxica"] = {
 		main_color = Color3.fromRGB(58, 156, 96),
@@ -128,6 +134,8 @@ local THEMES = {
 		stroke_thickness = 1.4,
 		open_icon = "🧪",
 		closed_icon = "💚",
+		gui_icon = "🌿",
+		gui_hidden_icon = "🍀",
 	},
 	["Oro Real"] = {
 		main_color = Color3.fromRGB(194, 145, 48),
@@ -140,6 +148,8 @@ local THEMES = {
 		stroke_thickness = 1.4,
 		open_icon = "🏆",
 		closed_icon = "✨",
+		gui_icon = "🪙",
+		gui_hidden_icon = "⭐",
 	},
 	["Rosa Sakura"] = {
 		main_color = Color3.fromRGB(196, 84, 142),
@@ -152,6 +162,8 @@ local THEMES = {
 		stroke_thickness = 1.4,
 		open_icon = "🌸",
 		closed_icon = "🎀",
+		gui_icon = "🌷",
+		gui_hidden_icon = "🫧",
 	},
 	["Mecha Titanio"] = {
 		main_color = Color3.fromRGB(138, 152, 172),
@@ -164,6 +176,8 @@ local THEMES = {
 		stroke_thickness = 1.3,
 		open_icon = "🛡️",
 		closed_icon = "⚙️",
+		gui_icon = "🔧",
+		gui_hidden_icon = "🔩",
 	},
 }
 
@@ -407,16 +421,25 @@ windowsFrame.BackgroundTransparency = 1
 windowsFrame.Size = UDim2.new(1, 0, 1, 0)
 
 local checks = { binding = false }
+local syncFloatingGuiBtn = nil
+
+local function toggleGuiVisibility()
+	if checks.binding then return end
+	imgui.Enabled = not imgui.Enabled
+	if syncFloatingGuiBtn then
+		pcall(syncFloatingGuiBtn)
+	end
+end
 
 runtime:Connect(UIS.InputBegan, function(input, gameProcessed)
 	if gameProcessed then return end
 	local toggleKey = (typeof(ui_options.toggle_key) == "EnumItem") and ui_options.toggle_key or Enum.KeyCode.RightShift
 	if input.KeyCode == toggleKey and not checks.binding then
-		imgui.Enabled = not imgui.Enabled
+		toggleGuiVisibility()
 	end
 end)
 
--- Botón flotante
+-- Botón flotante para ocultar/mostrar la GUI (cambia según el tema)
 local toggleGui = Instance.new("ScreenGui")
 toggleGui.Name = "ToggleUI"
 toggleGui.ResetOnSpawn = false
@@ -424,18 +447,19 @@ toggleGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 mountGui(toggleGui)
 runtime:AddCleanup(function() toggleGui:Destroy() end)
 
+local defaultThemeInfo = THEMES[DEFAULT_THEME_NAME]
 local btnSize = isCompactDevice() and 42 or 46
 local floatingBtn = Instance.new("TextButton")
 floatingBtn.Name = "OpenCloseBtn"
 floatingBtn.Parent = toggleGui
 floatingBtn.Active = true
-floatingBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+floatingBtn.BackgroundColor3 = shiftColor(defaultThemeInfo.bg_color, 0.05)
 floatingBtn.Position = UDim2.new(0.5, -math.floor(btnSize / 2), 0, 10)
 floatingBtn.Size = UDim2.new(0, btnSize, 0, btnSize)
-floatingBtn.Font = Enum.Font.GothamBold
-floatingBtn.Text = "⚙️"
+floatingBtn.Font = defaultThemeInfo.font_title
+floatingBtn.Text = defaultThemeInfo.gui_icon or "⚙️"
 floatingBtn.TextSize = isCompactDevice() and 18 or 20
-floatingBtn.TextColor3 = WHITE
+floatingBtn.TextColor3 = defaultThemeInfo.text_color
 floatingBtn.AutoButtonColor = false
 floatingBtn.ZIndex = 100
 
@@ -444,8 +468,8 @@ floatingCorner.CornerRadius = UDim.new(1, 0)
 floatingCorner.Parent = floatingBtn
 
 local floatingStroke = Instance.new("UIStroke")
-floatingStroke.Color = THEMES[DEFAULT_THEME_NAME].main_color
-floatingStroke.Thickness = 1.6
+floatingStroke.Color = defaultThemeInfo.main_color
+floatingStroke.Thickness = 1.5
 floatingStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 floatingStroke.Parent = floatingBtn
 
@@ -468,7 +492,7 @@ do
 				end
 			end, function()
 				if not hasMoved and not checks.binding then
-					imgui.Enabled = not imgui.Enabled
+					toggleGuiVisibility()
 				end
 			end)
 		end
@@ -579,6 +603,8 @@ function library:AddWindow(title, options)
 		palette.strokeThickness = math.min(t.stroke_thickness or 1.4, 1.5)
 		palette.openIcon = t.open_icon or "🔮"
 		palette.closedIcon = t.closed_icon or "💜"
+		palette.guiIcon = t.gui_icon or "⚙️"
+		palette.guiHiddenIcon = t.gui_hidden_icon or palette.guiIcon
 
 		palette.winBg = shiftColor(bg, 0.04)
 		palette.winStroke = shiftColor(bg, 0.16)
@@ -630,10 +656,19 @@ function library:AddWindow(title, options)
 		pcall(fn, palette)
 	end
 
-	local function broadcastTheme()
-		rebuildPalette()
+	local function applyFloatingTheme()
 		floatingStroke.Color = palette.main
 		floatingBtn.BackgroundColor3 = palette.floatingBg
+		floatingBtn.TextColor3 = palette.text
+		floatingBtn.Font = palette.fontTitle
+		floatingBtn.Text = imgui.Enabled and palette.guiIcon or palette.guiHiddenIcon
+	end
+
+	syncFloatingGuiBtn = applyFloatingTheme
+
+	local function broadcastTheme()
+		rebuildPalette()
+		applyFloatingTheme()
 
 		local cardRadius = UDim.new(0, palette.cornerCard)
 		for i = 1, #titleFontObjs do
@@ -653,8 +688,7 @@ function library:AddWindow(title, options)
 		end
 	end
 
-	floatingStroke.Color = palette.main
-	floatingBtn.BackgroundColor3 = palette.floatingBg
+	applyFloatingTheme()
 
 	local startX = math.max(12, math.floor((vp.X - initialSize.X) / 2) + ((windows - 1) * 18))
 	local startY = math.clamp(60 + ((windows - 1) * 18), 54, math.max(54, vp.Y - initialSize.Y - 12))
@@ -1526,7 +1560,7 @@ function library:AddWindow(title, options)
 				for _ in pairs(itemsMap) do count = count + 1 end
 				local targetListH = math.min(count * 28, 130)
 				listFrame.Size = UDim2.new(1, -12, 0, targetListH)
-				ddStroke.Color = isExpanded and palette.activeStroke or palette.cardStroke
+				ddStroke.Color = isExpanded and palette.activeStroke or p.cardStroke
 				Tween(wrapper, {Size = UDim2.new(1, 0, 0, isExpanded and (38 + targetListH) or 32)})
 			end
 
@@ -1734,7 +1768,7 @@ function library:AddWindow(title, options)
 				nameLbl.Parent = optBtn
 				nameLbl.BackgroundTransparency = 1
 				nameLbl.Position = UDim2.new(0, 32, 0, 0)
-				nameLbl.Size = UDim2.new(1, -92, 1, 0)
+				nameLbl.Size = UDim2.new(1, -110, 1, 0)
 				nameLbl.Font = tInfo.font_title
 				nameLbl.Text = tName
 				nameLbl.TextColor3 = tInfo.text_color
@@ -1745,12 +1779,12 @@ function library:AddWindow(title, options)
 				local iconPreviewLbl = Instance.new("TextLabel")
 				iconPreviewLbl.Parent = optBtn
 				iconPreviewLbl.BackgroundTransparency = 1
-				iconPreviewLbl.Position = UDim2.new(1, -56, 0, 0)
-				iconPreviewLbl.Size = UDim2.new(0, 48, 1, 0)
+				iconPreviewLbl.Position = UDim2.new(1, -76, 0, 0)
+				iconPreviewLbl.Size = UDim2.new(0, 68, 1, 0)
 				iconPreviewLbl.Font = Enum.Font.GothamBold
-				iconPreviewLbl.Text = (tInfo.open_icon or "🔮") .. " " .. (tInfo.closed_icon or "💜")
+				iconPreviewLbl.Text = (tInfo.gui_icon or "⚙️") .. " " .. (tInfo.open_icon or "🔮") .. " " .. (tInfo.closed_icon or "💜")
 				iconPreviewLbl.TextColor3 = tInfo.text_color
-				iconPreviewLbl.TextSize = 12
+				iconPreviewLbl.TextSize = 11
 				iconPreviewLbl.TextXAlignment = Enum.TextXAlignment.Right
 				iconPreviewLbl.ZIndex = 9
 
