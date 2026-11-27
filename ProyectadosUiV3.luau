@@ -103,6 +103,40 @@ local CoreGui
 if not isSolara then pcall(function() CoreGui = game:GetService("CoreGui") end) end
 if CoreGui then pcall(function() CoreGui = cloneref(CoreGui) end) end
 
+-- Control de bloqueo de cámara al arrastrar la UI
+local cameraLocks = 0
+local savedCameraType = nil
+
+local function setCameraLocked(locked)
+	local cam = workspace.CurrentCamera
+	if not cam then return end
+
+	if locked then
+		cameraLocks = cameraLocks + 1
+		if cameraLocks == 1 then
+			savedCameraType = cam.CameraType
+			cam.CameraType = Enum.CameraType.Scriptable
+		end
+	else
+		cameraLocks = math.max(0, cameraLocks - 1)
+		if cameraLocks == 0 and savedCameraType ~= nil then
+			if cam.CameraType == Enum.CameraType.Scriptable then
+				cam.CameraType = savedCameraType
+			end
+			savedCameraType = nil
+		end
+	end
+end
+
+runtime:AddCleanup(function()
+	cameraLocks = 0
+	local cam = workspace.CurrentCamera
+	if cam and savedCameraType ~= nil and cam.CameraType == Enum.CameraType.Scriptable then
+		cam.CameraType = savedCameraType
+	end
+	savedCameraType = nil
+end)
+
 local function getViewportSize()
 	local cam = workspace.CurrentCamera
 	if cam and cam.ViewportSize.X > 0 and cam.ViewportSize.Y > 0 then
@@ -185,6 +219,7 @@ local btnSize = isCompactDevice() and 40 or 44
 local floatingBtn = Instance.new("TextButton")
 floatingBtn.Name = "OpenCloseBtn"
 floatingBtn.Parent = toggleGui
+floatingBtn.Active = true
 floatingBtn.BackgroundColor3 = ui_options.main_color
 floatingBtn.Position = UDim2.new(0.5, -math.floor(btnSize / 2), 0, 10)
 floatingBtn.Size = UDim2.new(0, btnSize, 0, btnSize)
@@ -215,19 +250,23 @@ floatingGrad.Rotation = 45
 floatingGrad.Parent = floatingBtn
 
 do
-	local isDragging, dragStart, startPos, hasMoved = false, nil, nil, false
+	local isDragging, dragInput, dragStart, startPos, hasMoved = false, nil, nil, nil, false
 
 	runtime:Connect(floatingBtn.InputBegan, function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			isDragging = true
-			hasMoved = false
-			dragStart = input.Position
-			startPos = floatingBtn.Position
+			if not isDragging then
+				isDragging = true
+				dragInput = input
+				hasMoved = false
+				dragStart = input.Position
+				startPos = floatingBtn.Position
+				setCameraLocked(true)
+			end
 		end
 	end)
 
 	runtime:Connect(UIS.InputChanged, function(input)
-		if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		if isDragging and (input == dragInput or input.UserInputType == Enum.UserInputType.MouseMovement) then
 			if dragStart then
 				local delta = input.Position - dragStart
 				if math.abs(delta.X) > 6 or math.abs(delta.Y) > 6 then
@@ -242,12 +281,12 @@ do
 	end)
 
 	runtime:Connect(UIS.InputEnded, function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			if isDragging then
-				isDragging = false
-				if not hasMoved and not checks.binding then
-					imgui.Enabled = not imgui.Enabled
-				end
+		if isDragging and (input == dragInput or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+			isDragging = false
+			dragInput = nil
+			setCameraLocked(false)
+			if not hasMoved and not checks.binding then
+				imgui.Enabled = not imgui.Enabled
 			end
 		end
 	end)
@@ -278,25 +317,24 @@ local function addStroke(parent, color, thickness, transparency)
 	return s
 end
 
+-- Permite arrastrar desde cualquier parte de la ventana manteniendo quieta la cámara
 local function makeDraggable(dragHandle, targetFrame)
 	local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
 
 	runtime:Connect(dragHandle.InputBegan, function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
-			dragStart = input.Position
-			startPos = targetFrame.Position
-		end
-	end)
-
-	runtime:Connect(dragHandle.InputChanged, function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			dragInput = input
+			if not dragging then
+				dragging = true
+				dragInput = input
+				dragStart = input.Position
+				startPos = targetFrame.Position
+				setCameraLocked(true)
+			end
 		end
 	end)
 
 	runtime:Connect(UIS.InputChanged, function(input)
-		if input == dragInput and dragging then
+		if dragging and (input == dragInput or input.UserInputType == Enum.UserInputType.MouseMovement) then
 			local delta = input.Position - dragStart
 			targetFrame.Position = UDim2.new(
 				startPos.X.Scale, startPos.X.Offset + delta.X,
@@ -306,8 +344,10 @@ local function makeDraggable(dragHandle, targetFrame)
 	end)
 
 	runtime:Connect(UIS.InputEnded, function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		if dragging and (input == dragInput or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
 			dragging = false
+			dragInput = nil
+			setCameraLocked(false)
 		end
 	end)
 end
@@ -351,14 +391,14 @@ function library:AddWindow(title, options)
 
 	floatingBtn.BackgroundColor3 = opts.main_color
 
-	-- Posición inicial adaptada al centro de la pantalla
 	local startX = math.max(12, math.floor((vp.X - initialSize.X) / 2) + ((windows - 1) * 18))
 	local startY = math.clamp(60 + ((windows - 1) * 18), 54, math.max(54, vp.Y - initialSize.Y - 12))
 
-	-- Ventana Principal
+	-- Ventana Principal (Active = true bloquea el paso de toques hacia la cámara)
 	local Window = Instance.new("Frame")
 	Window.Name = "Window_" .. windows
 	Window.Parent = windowsFrame
+	Window.Active = true
 	Window.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 	Window.BorderSizePixel = 0
 	Window.ClipsDescendants = true
@@ -366,6 +406,9 @@ function library:AddWindow(title, options)
 	Window.Size = UDim2.new(0, initialSize.X, 0, initialSize.Y)
 	addCorner(Window, 8)
 	addStroke(Window, opts.main_color, 1.3, 0.2)
+
+	-- Habilitar arrastre en TODA la ventana
+	makeDraggable(Window, Window)
 
 	-- Barra Superior
 	local Bar = Instance.new("Frame")
@@ -390,8 +433,6 @@ function library:AddWindow(title, options)
 		ColorSequenceKeypoint.new(1, Color3.fromRGB(205, 205, 215))
 	})
 	barGrad.Parent = Bar
-
-	makeDraggable(Bar, Window)
 
 	-- Botón Minimizar (📽️ / ❤️‍🔥)
 	local ToggleBtn = Instance.new("TextButton")
@@ -515,16 +556,20 @@ function library:AddWindow(title, options)
 	end
 
 	if opts.can_resize then
-		local resizing, resizeStart, startSize = false, nil, nil
+		local resizing, resizeInput, resizeStart, startSize = false, nil, nil, nil
 		runtime:Connect(Resizer.InputBegan, function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-				resizing = true
-				resizeStart = input.Position
-				startSize = Window.AbsoluteSize
+				if not resizing then
+					resizing = true
+					resizeInput = input
+					resizeStart = input.Position
+					startSize = Window.AbsoluteSize
+					setCameraLocked(true)
+				end
 			end
 		end)
 		runtime:Connect(UIS.InputChanged, function(input)
-			if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			if resizing and (input == resizeInput or input.UserInputType == Enum.UserInputType.MouseMovement) then
 				local currentVp = getViewportSize()
 				local delta = input.Position - resizeStart
 				local newX = math.clamp(startSize.X + delta.X, opts.min_size.X, currentVp.X - 16)
@@ -533,8 +578,10 @@ function library:AddWindow(title, options)
 			end
 		end)
 		runtime:Connect(UIS.InputEnded, function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			if resizing and (input == resizeInput or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
 				resizing = false
+				resizeInput = nil
+				setCameraLocked(false)
 			end
 		end)
 	end
@@ -784,7 +831,7 @@ function library:AddWindow(title, options)
 			return switch_data, container
 		end
 
-		-- ELEMENTO: SLIDER (Soporte Mouse + Touch fluido)
+		-- ELEMENTO: SLIDER (Soporte Mouse + Touch con bloqueo de cámara)
 		function tab_data:AddSlider(slider_text, callback, slider_options)
 			local slider_data = {}
 			callback = typeof(callback) == "function" and callback or function() end
@@ -861,7 +908,7 @@ function library:AddWindow(title, options)
 			hitArea.Size = UDim2.new(1, -12, 0, 20)
 			hitArea.Text = ""
 
-			local sliding = false
+			local sliding, slideInput = false, nil
 
 			local function applyRatio(ratio)
 				ratio = math.clamp(ratio, 0, 1)
@@ -879,20 +926,26 @@ function library:AddWindow(title, options)
 			runtime:Connect(hitArea.InputBegan, function(input)
 				if readonly or dropdown_open then return end
 				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-					sliding = true
-					updateFromInput(input.Position)
+					if not sliding then
+						sliding = true
+						slideInput = input
+						setCameraLocked(true)
+						updateFromInput(input.Position)
+					end
 				end
 			end)
 
 			runtime:Connect(UIS.InputChanged, function(input)
-				if sliding and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+				if sliding and (input == slideInput or input.UserInputType == Enum.UserInputType.MouseMovement) then
 					updateFromInput(input.Position)
 				end
 			end)
 
 			runtime:Connect(UIS.InputEnded, function(input)
-				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				if sliding and (input == slideInput or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
 					sliding = false
+					slideInput = nil
+					setCameraLocked(false)
 				end
 			end)
 
