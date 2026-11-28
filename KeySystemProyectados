@@ -66,15 +66,16 @@ function KeySystem:Init(config)
 		return true
 	end
 
-	-- 3. UI Setup (safe parent fallback for iOS)
+	-- 3. UI Setup
 	local parentGui = nil
-	pcall(function()
-		if coreGui and coreGui:FindFirstChildWhichIsA("Instance") ~= nil or coreGui then
-			parentGui = coreGui
-		end
+	local okCore = pcall(function()
+		local testFrame = Instance.new("Frame")
+		testFrame.Parent = coreGui
+		testFrame:Destroy()
+		parentGui = coreGui
 	end)
-	if not parentGui then
-		parentGui = localPlayer:WaitForChild("PlayerGui", 10)
+	if not okCore or not parentGui then
+		parentGui = localPlayer:FindFirstChild("PlayerGui") or localPlayer:WaitForChild("PlayerGui", 10)
 	end
 	if not parentGui then
 		return false
@@ -92,16 +93,7 @@ function KeySystem:Init(config)
 	screenGui.ResetOnSpawn = false
 	screenGui.IgnoreGuiInset = true
 	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-	local attached = pcall(function()
-		screenGui.Parent = parentGui
-	end)
-	if not attached or not screenGui.Parent then
-		local playerGui = localPlayer:FindFirstChild("PlayerGui")
-		if playerGui then
-			screenGui.Parent = playerGui
-		end
-	end
+	screenGui.Parent = parentGui
 
 	local mainFrame = Instance.new("Frame")
 	mainFrame.Name = "MainFrame"
@@ -132,7 +124,7 @@ function KeySystem:Init(config)
 	local gradient = Instance.new("UIGradient")
 	gradient.Color = ColorSequence.new({
 		ColorSequenceKeypoint.new(0, Color3.fromRGB(26, 22, 38)),
-		ColorSequenceKeypoint.new(1, ColorSequenceKeypoint.new(0, 0) and Color3.fromRGB(15, 15, 22))
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 22))
 	})
 	gradient.Rotation = 90
 	gradient.Parent = mainFrame
