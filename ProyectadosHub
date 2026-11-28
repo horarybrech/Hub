@@ -1,1 +1,1 @@
-loadstring(game:HttpGet("https://raw.githubusercontent.com/horarybrech/Hub/refs/heads/main/Proyectados.luau"))()
+loadstring(game:HttpGet("https://cathub.fr/load/71f37620349dd451fb9e521dda5ad15b"))()
